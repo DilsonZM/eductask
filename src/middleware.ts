@@ -1,6 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function redirectWithCookies(
+  url: string | URL,
+  supabaseResponse: NextResponse
+) {
+  const response = NextResponse.redirect(url);
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie.name, cookie.value);
+  });
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -14,7 +25,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, cacheHeaders) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -24,6 +35,11 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
+          if (cacheHeaders) {
+            Object.entries(cacheHeaders).forEach(([key, value]) => {
+              supabaseResponse.headers.set(key, value);
+            });
+          }
         },
       },
     }
@@ -40,7 +56,7 @@ export async function middleware(request: NextRequest) {
   const isStudentPage = request.nextUrl.pathname.startsWith("/student");
 
   if (!user && !isAuthPage && !isPublicPage) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return redirectWithCookies(new URL("/login", request.url), supabaseResponse);
   }
 
   if (user) {
@@ -54,24 +70,24 @@ export async function middleware(request: NextRequest) {
 
     if (isAuthPage) {
       if (role === "admin") {
-        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+        return redirectWithCookies(new URL("/admin/dashboard", request.url), supabaseResponse);
       } else if (role === "teacher") {
-        return NextResponse.redirect(new URL("/teacher/dashboard", request.url));
+        return redirectWithCookies(new URL("/teacher/dashboard", request.url), supabaseResponse);
       } else {
-        return NextResponse.redirect(new URL("/student/dashboard", request.url));
+        return redirectWithCookies(new URL("/student/dashboard", request.url), supabaseResponse);
       }
     }
 
     if (isAdminPage && role !== "admin") {
-      return NextResponse.redirect(new URL(`/${role}/dashboard`, request.url));
+      return redirectWithCookies(new URL(`/${role}/dashboard`, request.url), supabaseResponse);
     }
 
     if (isTeacherPage && role !== "teacher") {
-      return NextResponse.redirect(new URL(`/${role}/dashboard`, request.url));
+      return redirectWithCookies(new URL(`/${role}/dashboard`, request.url), supabaseResponse);
     }
 
     if (isStudentPage && role !== "student") {
-      return NextResponse.redirect(new URL(`/${role}/dashboard`, request.url));
+      return redirectWithCookies(new URL(`/${role}/dashboard`, request.url), supabaseResponse);
     }
   }
 
