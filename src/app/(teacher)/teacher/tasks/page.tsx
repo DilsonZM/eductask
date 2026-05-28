@@ -116,7 +116,6 @@ export default function TasksPage() {
   const [filterSubjectId, setFilterSubjectId] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSubjects, setFilterSubjects] = useState<SelectOption[]>([]);
-  const [loadingFilterSubjects, setLoadingFilterSubjects] = useState(false);
 
   const loadTeacherId = useCallback(async () => {
     if (!user) return;
@@ -159,7 +158,6 @@ export default function TasksPage() {
   const loadSubjectsForClassroom = useCallback(
     async (classroomId: string, target: "modal" | "filter") => {
       if (target === "modal") setLoadingModalSubjects(true);
-      else setLoadingFilterSubjects(true);
 
       let query = supabaseRef.current
         .from("classroom_subjects")
@@ -185,7 +183,6 @@ export default function TasksPage() {
       } else {
         setFilterSubjects(options);
         setFilterSubjectId("");
-        setLoadingFilterSubjects(false);
       }
     },
     []

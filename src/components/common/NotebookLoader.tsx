@@ -27,8 +27,8 @@ const FALLBACK_MESSAGES = ["Preparando tu espacio de trabajo...","Cargando recur
 
 export function NotebookLoader({ module, role }: NotebookLoaderProps) {
   const [msg, setMsg] = useState("");
-  const [msgIndex, setMsgIndex] = useState(0);
   const [messages, setMessages] = useState<string[]>([]);
+  const indexRef = useRef(0);
   const supabaseRef = useRef(createClient());
   const moduleName = module ? MODULE_LABELS[module] || module : null;
 
@@ -50,7 +50,8 @@ export function NotebookLoader({ module, role }: NotebookLoaderProps) {
   useEffect(() => {
     if (!messages.length) { setMsg(module ? `Abriendo ${moduleName}...` : ""); return; }
     setMsg(messages[0]);
-    const timer = setInterval(() => { setMsgIndex(p => { const n = (p + 1) % messages.length; setMsg(messages[n]); return n; }); }, 3000);
+    indexRef.current = 0;
+    const timer = setInterval(() => { const n = (indexRef.current + 1) % messages.length; indexRef.current = n; setMsg(messages[n]); }, 3000);
     return () => clearInterval(timer);
   }, [messages, module, moduleName]);
 
