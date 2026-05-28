@@ -126,9 +126,7 @@ export default function ClassroomsPage() {
   return (
     <div>
       <PageHeader title="Salones" description="Gestionar salones" actionLabel="Nuevo Salón" onAction={() => handleOpenModal()} />
-      {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8"><p className="text-center text-gray-500">Cargando...</p></div>
-      ) : classrooms.length === 0 ? (
+      {loading ? null : classrooms.length === 0 ? (
         <EmptyState title="No hay salones" description="Comienza creando el primer salón" actionLabel="Nuevo Salón" onAction={() => handleOpenModal()} />
       ) : (
         <DataTable data={classrooms} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedClassroom(item); setDeleteDialogOpen(true); }} />

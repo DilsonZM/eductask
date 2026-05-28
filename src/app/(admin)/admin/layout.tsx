@@ -4,16 +4,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { NotebookLoader } from "@/components/common/NotebookLoader";
+import { LogoutOverlay } from "@/components/common/LogoutOverlay";
+import { ConfirmDialog } from "@/components/ui/Modal";
+import { NavigationProvider, NavigationOverlay } from "@/components/layout/NavigationContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [minDone, setMinDone] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinDone(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!loading && user?.role !== "admin") {
@@ -21,21 +29,25 @@ export default function AdminLayout({
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return <NotebookLoader label="Abriendo panel de administración" />;
-  }
+  const handleLogout = useCallback(() => setShowConfirm(true), []);
+  const confirmLogout = useCallback(() => { setShowConfirm(false); setLoggingOut(true); }, []);
+  const finishLogout = useCallback(() => { void logout(); }, [logout]);
 
-  if (user?.role !== "admin") {
-    return null;
-  }
+  if (loading || !minDone) return <NotebookLoader role="admin" />;
+  if (loggingOut) return <LogoutOverlay onDone={finishLogout} />;
+  if (user?.role !== "admin") return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar role="admin" />
-      <div className="flex-1 flex flex-col">
-        <AppHeader title="Panel de Administración" user={user} onLogout={() => void logout()} />
-        <main className="flex-1 p-6">{children}</main>
+    <NavigationProvider>
+      <ConfirmDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)} onConfirm={confirmLogout} title="Cerrar sesion" message="¿Deseas cerrar tu sesion actual?" confirmLabel="Si, salir" />
+      <div className="min-h-screen bg-slate-50 flex">
+        <Sidebar role="admin" isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 flex flex-col">
+          <AppHeader title="Panel de Administracion" user={user} onLogout={handleLogout} onMenuToggle={() => setSidebarOpen(true)} />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        </div>
       </div>
-    </div>
+      <NavigationOverlay />
+    </NavigationProvider>
   );
 }

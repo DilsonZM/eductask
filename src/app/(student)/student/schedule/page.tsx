@@ -2,77 +2,95 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import {
+  TimetableGrid,
+  type ScheduleSlot,
+} from "@/components/common/TimetableGrid";
 
-interface ScheduleWithDetails {
-  id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  location: string | null;
-  subject_name: string;
-}
-
-const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-
-export default function SchedulePage() {
-  const [schedules, setSchedules] = useState<ScheduleWithDetails[]>([]);
+export default function StudentSchedulePage() {
+  const { user } = useAuth();
+  const [schedules, setSchedules] = useState<ScheduleSlot[]>([]);
+  const [classroomName, setClassroomName] = useState("");
   const [loading, setLoading] = useState(true);
   const supabaseRef = useRef(createClient());
 
   const fetchData = useCallback(async () => {
+    if (!user) return;
     try {
-      const { data } = await supabaseRef.current
+      const { data: studentData } = await supabaseRef.current
+        .from("students")
+        .select("classroom_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!studentData?.classroom_id) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: classroomData } = await supabaseRef.current
+        .from("classrooms")
+        .select("name")
+        .eq("id", studentData.classroom_id)
+        .single();
+
+      setClassroomName(classroomData?.name || "");
+
+      const { data: scheduleData } = await supabaseRef.current
         .from("schedules")
-        .select("*, subjects(name)")
+        .select(
+          "*, subjects(name, code), classrooms(name), teachers(first_name, last_name)"
+        )
+        .eq("classroom_id", studentData.classroom_id)
         .order("day_of_week")
         .order("start_time");
-      if (data) {
-        setSchedules(data.map((s) => ({
-          ...s,
-          subject_name: (s.subjects as Record<string, string>)?.name || "",
-        })) as ScheduleWithDetails[]);
+
+      if (scheduleData) {
+        setSchedules(
+          scheduleData.map((s: Record<string, any>) => ({
+            id: s.id,
+            day_of_week: s.day_of_week,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            subject_name: s.subjects?.name || "Sin materia",
+            subject_code: s.subjects?.code,
+            classroom_name: s.classrooms?.name,
+            teacher_name: s.teachers
+              ? `${s.teachers.first_name || ""} ${s.teachers.last_name || ""}`.trim()
+              : undefined,
+            location: s.location,
+          }))
+        );
       }
     } catch (error) {
       console.error("Error:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const getSchedulesByDay = (day: number) => schedules.filter((s) => s.day_of_week === day);
-
   return (
-    <div>
-      <PageHeader title="Horario" description="Tu horario semanal" />
-      {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8"><p className="text-center text-gray-500">Cargando...</p></div>
-      ) : schedules.length === 0 ? (
-        <EmptyState title="No hay horario" description="No tienes horarios asignados" />
+    <div className="space-y-6">
+      <PageHeader
+        title="Horario"
+        description={
+          classroomName ? `Salón: ${classroomName}` : "Tu horario semanal"
+        }
+      />
+      {loading ? null : schedules.length === 0 ? (
+        <EmptyState
+          title="Sin horarios"
+          description="Tu salón no tiene horarios configurados aún"
+        />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-7 border-r border-gray-200">
-            {days.slice(1).map((day, index) => (
-              <div key={day} className="min-h-[300px] border-r border-gray-200 last:border-r-0">
-                <div className="bg-gray-50 p-3 text-center font-semibold border-b border-gray-200">{day}</div>
-                <div className="p-2 space-y-2">
-                  {getSchedulesByDay(index + 1).map((schedule) => (
-                    <div key={schedule.id} className="bg-secondary-50 border border-secondary-200 rounded-lg p-3">
-                      <p className="font-medium text-secondary-900 text-sm">{schedule.start_time} - {schedule.end_time}</p>
-                      <p className="text-secondary-700 text-sm">{schedule.subject_name}</p>
-                      {schedule.location && <p className="text-secondary-600 text-xs">{schedule.location}</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <TimetableGrid schedules={schedules} />
       )}
     </div>
   );

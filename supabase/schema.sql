@@ -5,6 +5,7 @@ CREATE TABLE public.users (
   email TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin','teacher','student')),
   avatar TEXT,
+  phone TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','suspended')),
   last_login_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -139,6 +140,7 @@ CREATE TABLE public.tasks (
   instructions TEXT,
   teacher_id UUID REFERENCES public.teachers(id),
   classroom_subject_id UUID REFERENCES public.classroom_subjects(id),
+  school_period_id UUID REFERENCES public.school_periods(id),
   due_date TIMESTAMPTZ NOT NULL,
   max_score NUMERIC DEFAULT 10,
   allow_late BOOLEAN DEFAULT TRUE,
@@ -167,6 +169,8 @@ CREATE TABLE public.submissions (
   file_name TEXT NOT NULL,
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   comments TEXT,
+  score NUMERIC,
+  teacher_comment TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

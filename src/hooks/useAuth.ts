@@ -11,6 +11,8 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   name: string;
+  avatar: string | null;
+  phone: string | null;
 }
 
 export type { UserRole };
@@ -34,6 +36,8 @@ export function useAuth() {
         email: profile.email,
         role: profile.role as UserRole,
         name: profile.name,
+        avatar: profile.avatar ?? null,
+        phone: profile.phone ?? null,
       });
     }
   }, []);
@@ -48,6 +52,8 @@ export function useAuth() {
         email: authUser.email || "",
         role,
         name: name || authUser.email || "Usuario",
+        avatar: null,
+        phone: null,
       });
       return true;
     }
@@ -64,11 +70,8 @@ export function useAuth() {
         const authUser = session?.user;
 
         if (authUser) {
-          const hasMetadataUser = setUserFromMetadata(authUser);
-
-          if (!hasMetadataUser) {
-            void getProfile(authUser.id);
-          }
+          setUserFromMetadata(authUser);
+          void getProfile(authUser.id);
         }
       } catch (error) {
         console.error("Error loading auth session:", error);
@@ -83,11 +86,8 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
-          const hasMetadataUser = setUserFromMetadata(session.user);
-
-          if (!hasMetadataUser) {
-            void getProfile(session.user.id);
-          }
+          setUserFromMetadata(session.user);
+          void getProfile(session.user.id);
         } else {
           setUser(null);
         }
@@ -125,5 +125,35 @@ export function useAuth() {
     router.push("/login");
   };
 
-  return { user, loading, login, logout };
+  const updateProfile = async (updates: { name?: string; avatar?: string | null; phone?: string | null }) => {
+    if (!user) return;
+
+    const payload: Record<string, unknown> = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.avatar !== undefined) payload.avatar = updates.avatar;
+    if (updates.phone !== undefined) payload.phone = updates.phone;
+
+    const supabase = supabaseRef.current as any;
+    const { data, error } = await supabase
+      .from("users")
+      .update(payload)
+      .eq("id", user.id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    if (data) {
+      setUser({
+        id: data.id,
+        email: data.email,
+        role: data.role as UserRole,
+        name: data.name,
+        avatar: data.avatar ?? null,
+        phone: data.phone ?? null,
+      });
+    }
+  };
+
+  return { user, loading, login, logout, updateProfile };
 }

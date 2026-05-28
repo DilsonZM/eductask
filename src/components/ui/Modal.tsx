@@ -9,10 +9,13 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  size?: "sm" | "md" | "lg";
 }
 
-export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, footer, size = "md" }: ModalProps) {
   if (!isOpen) return null;
+
+  const sizeClass = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-lg";
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -21,7 +24,7 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
           className="fixed inset-0 bg-black/50 transition-opacity"
           onClick={onClose}
         />
-        <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all">
+        <div className={`relative bg-white rounded-xl shadow-xl w-full transform transition-all ${sizeClass}`}>
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             <button

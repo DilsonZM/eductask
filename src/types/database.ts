@@ -16,6 +16,7 @@ export interface Database {
           email: string;
           role: "admin" | "teacher" | "student";
           avatar: string | null;
+          phone: string | null;
           status: "active" | "inactive" | "suspended";
           last_login_at: string | null;
           created_at: string;
@@ -27,6 +28,7 @@ export interface Database {
           email: string;
           role?: "admin" | "teacher" | "student";
           avatar?: string | null;
+          phone?: string | null;
           status?: "active" | "inactive" | "suspended";
           last_login_at?: string | null;
           created_at?: string;
@@ -38,6 +40,7 @@ export interface Database {
           email?: string;
           role?: "admin" | "teacher" | "student";
           avatar?: string | null;
+          phone?: string | null;
           status?: "active" | "inactive" | "suspended";
           last_login_at?: string | null;
           created_at?: string;
@@ -376,6 +379,7 @@ export interface Database {
           instructions: string | null;
           teacher_id: string | null;
           classroom_subject_id: string | null;
+          school_period_id: string | null;
           due_date: string;
           max_score: number;
           allow_late: boolean;
@@ -390,6 +394,7 @@ export interface Database {
           instructions?: string | null;
           teacher_id?: string | null;
           classroom_subject_id?: string | null;
+          school_period_id?: string | null;
           due_date: string;
           max_score?: number;
           allow_late?: boolean;
@@ -404,6 +409,7 @@ export interface Database {
           instructions?: string | null;
           teacher_id?: string | null;
           classroom_subject_id?: string | null;
+          school_period_id?: string | null;
           due_date?: string;
           max_score?: number;
           allow_late?: boolean;

@@ -153,11 +153,7 @@ export default function StudentsPage() {
         onAction={() => handleOpenModal()}
       />
 
-      {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8">
-          <p className="text-center text-gray-500">Cargando...</p>
-        </div>
-      ) : students.length === 0 ? (
+      {loading ? null : students.length === 0 ? (
         <EmptyState
           title="No hay alumnos"
           description="Comienza agregando el primer alumno"

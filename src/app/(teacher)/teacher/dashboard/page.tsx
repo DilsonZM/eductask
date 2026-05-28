@@ -1,106 +1,269 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { StatsCard } from "@/components/common/StatsCard";
-import { CardSkeleton } from "@/components/common/SkeletonLoader";
+import { DashboardCalendar, CalendarEvent } from "@/components/common/DashboardCalendar";
 import { formatDate } from "@/lib/utils";
-import { BookOpen, CheckSquare, FileText, Clock } from "lucide-react";
+import { BookOpen, CheckSquare, FileText, Users } from "lucide-react";
 import Link from "next/link";
 
+interface NewsItem { id: string; title: string; published_at: string | null; }
+interface Event { id: string; title: string; start_date: string; color: string | null; location: string | null; }
+
 export default function TeacherDashboard() {
-  const [stats, setStats] = useState({ assignedSubjects: 0, pendingTasks: 0, pendingSubmissions: 0, upcomingSchedules: 0 });
-  const [recentTasks, setRecentTasks] = useState<{ id: string; title: string; due_date: string }[]>([]);
+  const { user } = useAuth();
+  const [stats, setStats] = useState({
+    assignedSubjects: 0,
+    publishedTasks: 0,
+    pendingSubmissions: 0,
+    totalStudents: 0,
+  });
+  const [recentTasks, setRecentTasks] = useState<
+    { id: string; title: string; due_date: string; status: string }[]
+  >([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const supabaseRef = useRef(createClient());
 
   const fetchData = useCallback(async () => {
+    if (!user) return;
     try {
-      const [subjectsRes, tasksRes, submissionsRes, schedulesRes, tasksWithDateRes] = await Promise.all([
-        supabaseRef.current.from("teacher_assignments").select("id", { count: "exact" }),
-        supabaseRef.current.from("tasks").select("id", { count: "exact" }),
-        supabaseRef.current.from("submissions").select("id", { count: "exact" }),
-        supabaseRef.current.from("schedules").select("id", { count: "exact" }),
-        supabaseRef.current.from("tasks").select("id, title, due_date").order("due_date").limit(5),
-      ]);
+      const { data: teacherData } = await supabaseRef.current
+        .from("teachers")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      const teacherId = teacherData?.id;
+      if (!teacherId) {
+        setLoading(false);
+        return;
+      }
+
+      const [assignmentsRes, publishedTasksRes, tasksWithDateRes, taskIdsRes, eventsRes, newsRes] =
+        await Promise.all([
+          supabaseRef.current
+            .from("teacher_assignments")
+            .select("id, classroom_id", { count: "exact" })
+            .eq("teacher_id", teacherId),
+          supabaseRef.current
+            .from("tasks")
+            .select("id", { count: "exact" })
+            .eq("teacher_id", teacherId)
+            .eq("status", "published"),
+          supabaseRef.current
+            .from("tasks")
+            .select("id, title, due_date, status")
+            .eq("teacher_id", teacherId)
+            .eq("status", "published")
+            .order("due_date")
+            .limit(5),
+          supabaseRef.current
+            .from("tasks")
+            .select("id")
+            .eq("teacher_id", teacherId)
+            .eq("status", "published"),
+          supabaseRef.current.from("events").select("*").gte("start_date", new Date().toISOString()).order("start_date").limit(8),
+          supabaseRef.current.from("news").select("id, title, published_at").eq("is_published", true).order("published_at", { ascending: false }).limit(8),
+        ]);
+
+      let pendingSubmissionsCount = 0;
+      const taskIds = (taskIdsRes.data || []).map((t) => t.id);
+      if (taskIds.length > 0) {
+        const { count } = await supabaseRef.current
+          .from("submissions")
+          .select("id", { count: "exact", head: true })
+          .in("task_id", taskIds)
+          .is("score", null);
+        pendingSubmissionsCount = count || 0;
+      }
+
+      const classroomIds = Array.from(
+        new Set((assignmentsRes.data || []).map((a) => a.classroom_id).filter(Boolean))
+      );
+      let totalStudents = 0;
+      if (classroomIds.length > 0) {
+        const { count } = await supabaseRef.current
+          .from("students")
+          .select("id", { count: "exact", head: true })
+          .in("classroom_id", classroomIds)
+          .eq("status", "active");
+        totalStudents = count || 0;
+      }
+
       setStats({
-        assignedSubjects: subjectsRes.count || 0,
-        pendingTasks: tasksRes.count || 0,
-        pendingSubmissions: submissionsRes.count || 0,
-        upcomingSchedules: schedulesRes.count || 0,
+        assignedSubjects: assignmentsRes.count || 0,
+        publishedTasks: publishedTasksRes.count || 0,
+        pendingSubmissions: pendingSubmissionsCount,
+        totalStudents,
       });
       if (tasksWithDateRes.data) setRecentTasks(tasksWithDateRes.data);
+      if (eventsRes.data) setEvents(eventsRes.data);
+      if (newsRes.data) setNews(newsRes.data);
     } catch (error) {
       console.error("Error:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
-        </div>
-      </div>
-    );
-  }
+  const calendarEvents = useMemo((): CalendarEvent[] => {
+    const result: CalendarEvent[] = [];
+    const now = new Date();
+
+    for (const t of recentTasks) {
+      const daysLeft = Math.ceil((new Date(t.due_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      result.push({
+        id: t.id,
+        title: t.title,
+        date: t.due_date,
+        type: "task",
+        taskStatus: "pending",
+        daysLeft,
+      });
+    }
+
+    for (const ev of events) {
+      result.push({
+        id: ev.id,
+        title: ev.title,
+        date: ev.start_date,
+        type: "event",
+        color: ev.color,
+      });
+    }
+
+    for (const n of news) {
+      if (n.published_at) {
+        result.push({
+          id: n.id,
+          title: n.title,
+          date: n.published_at,
+          type: "news",
+        });
+      }
+    }
+
+    return result;
+  }, [recentTasks, events, news]);
+
+  if (loading) return null;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-        <p className="text-gray-500">Bienvenido al panel del profesor</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+          Panel del Profesor
+        </p>
+        <h2 className="text-2xl font-semibold text-slate-900 font-serif">
+          Dashboard
+        </h2>
+      </div>
+      <p className="text-slate-500 text-sm max-w-lg">
+        Gestiona tareas, entregas y horarios con una vista clara de tus
+        materias.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <StatsCard
+          title="Materias"
+          value={stats.assignedSubjects}
+          icon={<BookOpen className="w-5 h-5" />}
+        />
+        <StatsCard
+          title="Tareas Publicadas"
+          value={stats.publishedTasks}
+          icon={<FileText className="w-5 h-5" />}
+        />
+        <StatsCard
+          title="Entregas Pendientes"
+          value={stats.pendingSubmissions}
+          icon={<CheckSquare className="w-5 h-5" />}
+        />
+        <StatsCard
+          title="Alumnos"
+          value={stats.totalStudents}
+          icon={<Users className="w-5 h-5" />}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard title="Materias Asignadas" value={stats.assignedSubjects} icon={<BookOpen className="w-6 h-6" />} />
-        <StatsCard title="Tareas Creadas" value={stats.pendingTasks} icon={<CheckSquare className="w-6 h-6" />} />
-        <StatsCard title="Entregas Pendientes" value={stats.pendingSubmissions} icon={<FileText className="w-6 h-6" />} />
-        <StatsCard title="Horarios Activos" value={stats.upcomingSchedules} icon={<Clock className="w-6 h-6" />} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tareas Recientes</h3>
-          {recentTasks.length > 0 ? (
-            <div className="space-y-3">
-              {recentTasks.map((task) => (
-                <Link key={task.id} href="/teacher/tasks" className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                  <p className="font-medium text-gray-900">{task.title}</p>
-                  <p className="text-sm text-gray-500">Fecha límite: {formatDate(task.due_date)}</p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-8">No hay tareas recientes</p>
-          )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-3">
+          <DashboardCalendar events={calendarEvents} />
         </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Accesos Rápidos</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <Link href="/teacher/tasks" className="p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition text-center">
-              <CheckSquare className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-              <p className="font-medium text-primary-900">Tareas</p>
-            </Link>
-            <Link href="/teacher/submissions" className="p-4 bg-secondary-50 rounded-lg hover:bg-secondary-100 transition text-center">
-              <FileText className="w-8 h-8 text-secondary-600 mx-auto mb-2" />
-              <p className="font-medium text-secondary-900">Entregas</p>
-            </Link>
-            <Link href="/teacher/grades" className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition text-center">
-              <BookOpen className="w-8 h-8 text-green-600 mx-auto mb-2" />
-              <p className="font-medium text-green-900">Notas</p>
-            </Link>
-            <Link href="/teacher/schedule" className="p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition text-center">
-              <Clock className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-              <p className="font-medium text-orange-900">Horario</p>
-            </Link>
+        <div className="lg:col-span-5">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 h-full">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Tareas</p>
+              <Link href="/teacher/tasks" className="text-sm text-primary-600 hover:text-primary-800 font-medium">Ver todas</Link>
+            </div>
+            {recentTasks.length > 0 ? (
+              <div className="space-y-2">
+                {recentTasks.map((task) => {
+                  const daysLeft = Math.ceil((new Date(task.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  return (
+                    <Link key={task.id} href="/teacher/tasks" className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate text-sm">{task.title}</p>
+                        <p className="text-xs text-slate-500">
+                          Entrega: {formatDate(task.due_date)}
+                          {daysLeft <= 2 && daysLeft >= 0 && (
+                            <span className="ml-2 text-rose-500 font-medium">{daysLeft === 0 ? "Hoy" : `${daysLeft}d`}</span>
+                          )}
+                          {daysLeft < 0 && (
+                            <span className="ml-2 text-red-500 font-medium">Vencida</span>
+                          )}
+                        </p>
+                      </div>
+                      <span className="ml-3 inline-flex px-2 py-0.5 text-xs font-medium rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                        Publicada
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-48 text-slate-400">
+                <p className="text-sm">No hay tareas publicadas</p>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="lg:col-span-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm h-full">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400 mb-3">Eventos</p>
+            {events.length > 0 ? (
+              <div className="space-y-3">
+                {events.map((event) => (
+                  <div key={event.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                      style={{ backgroundColor: event.color || "#7c3aed" }}
+                    >
+                      {new Date(event.start_date).getDate()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-900 text-sm truncate">{event.title}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatDate(event.start_date)}
+                        {event.location ? ` - ${event.location}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-48 text-slate-400">
+                <p className="text-sm">No hay eventos proximos</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

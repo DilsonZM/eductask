@@ -145,7 +145,7 @@ export default function UsersPage() {
   ];
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Usuarios"
         description="Gestionar cuentas de usuarios"
@@ -153,11 +153,7 @@ export default function UsersPage() {
         onAction={() => handleOpenModal()}
       />
 
-      {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8">
-          <p className="text-center text-gray-500">Cargando...</p>
-        </div>
-      ) : users.length === 0 ? (
+      {loading ? null : users.length === 0 ? (
         <EmptyState
           title="No hay usuarios"
           description="Comienza creando el primer usuario"
@@ -230,9 +226,12 @@ export default function UsersPage() {
             />
           </div>
           {!selectedUser && (
-            <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-              La contraseña temporal será: <strong>demo123</strong>
-            </p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Acceso inicial</p>
+              <p className="text-sm text-slate-600 mt-1">
+                Contraseña temporal: <strong className="text-slate-900">demo123</strong>
+              </p>
+            </div>
           )}
         </form>
       </Modal>

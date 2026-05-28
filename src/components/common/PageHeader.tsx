@@ -15,11 +15,12 @@ export function PageHeader({
   onAction,
 }: PageHeaderProps) {
   return (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Panel</p>
+        <h1 className="text-3xl font-semibold text-slate-900 mt-1 font-serif">{title}</h1>
         {description && (
-          <p className="text-gray-500 mt-1">{description}</p>
+          <p className="text-slate-500 mt-2 max-w-xl">{description}</p>
         )}
       </div>
       {actionLabel && onAction && (

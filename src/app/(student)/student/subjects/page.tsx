@@ -2,52 +2,212 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ShimmerGrid } from "@/components/common/SkeletonLoader";
+import { BookOpen, ChevronDown } from "lucide-react";
 
-interface Subject { id: string; name: string; description: string | null; code: string; credits: number; }
+interface SubjectData {
+  id: string;
+  name: string;
+  code: string;
+  credits: number;
+  classroomSubjectId: string;
+  curriculum: Record<string, string | null>;
+}
+
+interface SchoolPeriod {
+  id: string;
+  name: string;
+  order: number;
+}
+
+const SUBJECT_COLORS = [
+  { bg: "bg-blue-100", text: "text-blue-700" },
+  { bg: "bg-emerald-100", text: "text-emerald-700" },
+  { bg: "bg-violet-100", text: "text-violet-700" },
+  { bg: "bg-amber-100", text: "text-amber-700" },
+  { bg: "bg-rose-100", text: "text-rose-700" },
+  { bg: "bg-cyan-100", text: "text-cyan-700" },
+  { bg: "bg-fuchsia-100", text: "text-fuchsia-700" },
+  { bg: "bg-lime-100", text: "text-lime-700" },
+];
+
+function getSubjectColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return SUBJECT_COLORS[Math.abs(hash) % SUBJECT_COLORS.length];
+}
 
 export default function SubjectsPage() {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const supabaseRef = useRef(createClient());
 
+  const [subjects, setSubjects] = useState<SubjectData[]>([]);
+  const [periods, setPeriods] = useState<SchoolPeriod[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const fetchData = useCallback(async () => {
+    const supabase = supabaseRef.current;
+    const userId = user?.id;
+    if (!userId) return;
+
     try {
-      const { data } = await supabaseRef.current.from("subjects").select("*").order("name");
-      if (data) setSubjects(data);
+      const { data: student } = await supabase
+        .from("students")
+        .select("id, classroom_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (!student || !student.classroom_id) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: periodsData } = await supabase
+        .from("school_periods")
+        .select("id, name, order")
+        .order("order", { ascending: true });
+
+      const { data: csRows } = await supabase
+        .from("classroom_subjects")
+        .select("id, subjects(id, name, code, credits)")
+        .eq("classroom_id", student.classroom_id);
+
+      const classroomSubjects = csRows || [];
+      const csIds = classroomSubjects.map((r) => r.id);
+
+      const curriculumMap: Record<string, Record<string, string | null>> = {};
+
+      if (csIds.length > 0) {
+        const { data: entries } = await supabase
+          .from("curriculum_entries")
+          .select("classroom_subject_id, school_period_id, content")
+          .in("classroom_subject_id", csIds);
+
+        (entries || []).forEach((entry) => {
+          if (!curriculumMap[entry.classroom_subject_id]) {
+            curriculumMap[entry.classroom_subject_id] = {};
+          }
+          curriculumMap[entry.classroom_subject_id][entry.school_period_id] = entry.content;
+        });
+      }
+
+      const subjectsData: SubjectData[] = classroomSubjects
+        .filter((cs) => cs.subjects && typeof cs.subjects === "object" && !Array.isArray(cs.subjects))
+        .map((cs) => {
+          const subj = cs.subjects as unknown as Record<string, unknown>;
+          return {
+            id: (subj.id as string) || cs.id,
+            name: (subj.name as string) || "Sin nombre",
+            code: (subj.code as string) || "",
+            credits: (subj.credits as number) ?? 0,
+            classroomSubjectId: cs.id,
+            curriculum: curriculumMap[cs.id] || {},
+          };
+        });
+
+      setSubjects(subjectsData.sort((a, b) => a.name.localeCompare(b.name)));
+      setPeriods((periodsData || []) as SchoolPeriod[]);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error fetching subjects:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
   return (
-    <div>
-      <PageHeader title="Materias" description="Materias disponibles" />
+    <div className="space-y-6">
+      <PageHeader title="Materias" description="Materias de tu curso con el temario por trimestre" />
+
       {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8"><p className="text-center text-gray-500">Cargando...</p></div>
+        <ShimmerGrid count={6} />
       ) : subjects.length === 0 ? (
-        <EmptyState title="No hay materias" description="No hay materias disponibles" />
+        <EmptyState
+          title="No hay materias"
+          description="No tienes materias asignadas en tu curso"
+          icon={<BookOpen className="w-8 h-8" />}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {subjects.map((subject) => (
-            <div key={subject.id} className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{subject.name}</h3>
-                  <p className="text-xs text-gray-500 mt-1">{subject.code}</p>
+          {subjects.map((subject) => {
+            const color = getSubjectColor(subject.name);
+            const isExpanded = expandedId === subject.id;
+
+            return (
+              <div
+                key={subject.id}
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+              >
+                <button
+                  onClick={() => toggleExpand(subject.id)}
+                  className="w-full p-6 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer"
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl ${color.bg} flex items-center justify-center shrink-0`}
+                    >
+                      <BookOpen className={`w-5 h-5 ${color.text}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-slate-900 font-serif">
+                        {subject.name}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-xs text-slate-400">{subject.code}</span>
+                        <span className={`px-2 py-0.5 ${color.bg} ${color.text} text-xs rounded-full font-medium`}>
+                          {subject.credits} créditos
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`w-5 h-5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                        isExpanded ? "rotate-180" : ""
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                <div
+                  className={`transition-all duration-300 ease-in-out ${
+                    isExpanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+                  } overflow-hidden`}
+                >
+                  <div className="px-6 pb-6 space-y-3">
+                    {periods.map((period) => {
+                      const content = subject.curriculum[period.id];
+                      return (
+                        <div key={period.id} className="bg-slate-50 rounded-lg p-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                            {period.name}
+                          </p>
+                          {content ? (
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                              {content}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-slate-400 italic">Pendiente</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <span className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full">{subject.credits} créditos</span>
               </div>
-              {subject.description && <p className="text-sm text-gray-500 mt-3">{subject.description}</p>}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
