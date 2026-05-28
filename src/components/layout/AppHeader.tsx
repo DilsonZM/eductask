@@ -28,12 +28,11 @@ export function AppHeader({ title, description, user: propUser, onLogout, onMenu
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [avatarVersion, setAvatarVersion] = useState(0);
   const [isPreviewOpen, setPreviewOpen] = useState(false);
 
   const user = hookUser || propUser;
   const displayAvatar = hookUser?.avatar || propUser?.avatar || null;
-  const avatarSrc = displayAvatar ? `${displayAvatar}?v=${avatarVersion}` : null;
+  const avatarSrc = displayAvatar || null;
 
   const [formData, setFormData] = useState({
     name: user?.name || "",
@@ -119,11 +118,10 @@ export function AppHeader({ title, description, user: propUser, onLogout, onMenu
       if (uploadError) throw uploadError;
 
       const { data } = supabaseRef.current.storage.from("avatars").getPublicUrl(path);
-      const publicUrl = data.publicUrl;
+      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
 
       await updateProfile({ avatar: publicUrl });
       setFormData((prev) => ({ ...prev, avatar: publicUrl }));
-      setAvatarVersion((v) => v + 1);
       toast.success("Foto actualizada");
     } catch (error) {
       console.error("Error uploading avatar:", error);
@@ -142,7 +140,6 @@ export function AppHeader({ title, description, user: propUser, onLogout, onMenu
       await supabaseRef.current.storage.from("avatars").remove([`${user.id}/avatar.jpg`]);
       await updateProfile({ avatar: null, phone: null });
       setFormData((prev) => ({ ...prev, avatar: "", phone: "" }));
-      setAvatarVersion((v) => v + 1);
       toast.success("Datos eliminados");
     } catch (error) {
       console.error("Error clearing data:", error);
@@ -212,7 +209,6 @@ export function AppHeader({ title, description, user: propUser, onLogout, onMenu
             <p className="text-sm font-medium text-slate-900">{user?.name}</p>
             <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
           </div>
-          <User className="w-4 h-4 text-slate-400 hidden sm:block" />
         </button>
 
         <button
