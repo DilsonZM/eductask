@@ -1,36 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { NotebookLoader } from "@/components/common/NotebookLoader";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showLoader, setShowLoader] = useState(false);
-  const { login } = useAuth();
+  const { user, loading, login } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.role === "admin") router.replace("/admin/dashboard");
+      else if (user.role === "teacher") router.replace("/teacher/dashboard");
+      else router.replace("/student/dashboard");
+    }
+  }, [user, loading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-    setShowLoader(true);
 
     try {
       await login(email, password);
     } catch {
-      setShowLoader(false);
       setError("Correo o contrasena incorrectos. Intente de nuevo.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (showLoader) {
-    return <NotebookLoader />;
+  if (loading) {
+    return null;
   }
 
   return (
