@@ -56,6 +56,8 @@ export default function SubjectsPage() {
   const [curriculumEntries, setCurriculumEntries] = useState<CurriculumEntry[]>([]);
   const [loadingTemario, setLoadingTemario] = useState(false);
   const [savingTemario, setSavingTemario] = useState(false);
+  const [temarioDirtyConfirm, setTemarioDirtyConfirm] = useState(false);
+  const initialEntriesRef = useRef<CurriculumEntry[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -138,6 +140,7 @@ export default function SubjectsPage() {
           }
         }
         setCurriculumEntries(entries);
+        initialEntriesRef.current = JSON.parse(JSON.stringify(entries));
       } catch (error) {
         console.error("Error:", error);
       } finally {
@@ -274,8 +277,33 @@ export default function SubjectsPage() {
     setTemarioSubject(subject.id);
     setTemarioClassroom("");
     setCurriculumEntries([]);
+    initialEntriesRef.current = [];
     setTemarioOpen(true);
   };
+
+  const hasTemarioChanges = useCallback(() => {
+    const initial = initialEntriesRef.current;
+    if (initial.length !== curriculumEntries.length) return true;
+    for (let i = 0; i < curriculumEntries.length; i++) {
+      const cur = curriculumEntries[i];
+      const ini = initial[i];
+      if (cur.content !== ini.content || cur.files.length !== ini.files.length) return true;
+    }
+    return false;
+  }, [curriculumEntries]);
+
+  const handleCloseTemario = useCallback(() => {
+    if (hasTemarioChanges()) {
+      setTemarioDirtyConfirm(true);
+    } else {
+      setTemarioOpen(false);
+    }
+  }, [hasTemarioChanges]);
+
+  const confirmCloseTemario = useCallback(() => {
+    setTemarioDirtyConfirm(false);
+    setTemarioOpen(false);
+  }, []);
 
   const handleSaveTemario = async () => {
     if (!temarioClassroom || !temarioSubject) {
@@ -326,6 +354,7 @@ export default function SubjectsPage() {
       }
 
       toast.success("Temario guardado correctamente");
+      initialEntriesRef.current = JSON.parse(JSON.stringify(curriculumEntries));
       setTemarioOpen(false);
     } catch (error) {
       console.error("Error:", error);
@@ -435,12 +464,12 @@ export default function SubjectsPage() {
 
         <Modal
           isOpen={temarioOpen}
-          onClose={() => setTemarioOpen(false)}
+          onClose={handleCloseTemario}
           title={`Temario: ${selectedSubject?.name || ""}`}
           size="xl"
           footer={
             <>
-              <Button variant="outline" onClick={() => setTemarioOpen(false)}>
+              <Button variant="outline" onClick={handleCloseTemario}>
                 Cancelar
               </Button>
               <Button onClick={handleSaveTemario} isLoading={savingTemario}>
@@ -557,6 +586,15 @@ export default function SubjectsPage() {
           />
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={temarioDirtyConfirm}
+        onClose={() => setTemarioDirtyConfirm(false)}
+        onConfirm={confirmCloseTemario}
+        title="Salir del editor"
+        message="Tienes cambios sin guardar en el temario. ¿Deseas salir sin guardar?"
+        confirmLabel="Salir sin guardar"
+      />
 
       <ConfirmDialog
         isOpen={deleteDialogOpen}
