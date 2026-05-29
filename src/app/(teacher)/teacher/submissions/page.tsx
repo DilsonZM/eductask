@@ -102,13 +102,6 @@ export default function SubmissionsPage() {
     loadTasks();
   }, [loadTasks]);
 
-  useEffect(() => {
-    if (selectedTaskId && tasks.length > 0) {
-      const task = tasks.find((t) => t.id === selectedTaskId);
-      if (task) loadSubmissions(task);
-    }
-  }, [selectedTaskId, tasks, loadSubmissions]);
-
   const selectedTaskData = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) || null,
     [tasks, selectedTaskId]
@@ -189,6 +182,13 @@ export default function SubmissionsPage() {
     []
   );
 
+  useEffect(() => {
+    if (selectedTaskId && tasks.length > 0) {
+      const task = tasks.find((t) => t.id === selectedTaskId);
+      if (task) loadSubmissions(task);
+    }
+  }, [selectedTaskId, tasks, loadSubmissions]);
+
   const handleTaskChange = (value: string) => {
     setSelectedTaskId(value);
     setSubmissions([]);
@@ -263,11 +263,6 @@ export default function SubmissionsPage() {
         );
     }
   };
-
-  const taskOptions = tasks.map((t) => ({
-    value: t.id,
-    label: `${t.title} — ${t.subject_name} (${new Date(t.due_date).toLocaleDateString("es-ES")})`,
-  }));
 
   return (
     <div className="space-y-6">

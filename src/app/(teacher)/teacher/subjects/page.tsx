@@ -8,7 +8,15 @@ import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { SubjectCard, getSubjectColor } from "@/components/common/SubjectCard";
 import { CurriculumView } from "@/components/common/CurriculumView";
 import { cn } from "@/lib/utils";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Users, Clock, AlertCircle, GraduationCap, ChevronRight } from "lucide-react";
+
+interface StudentInfo {
+  id: string; name: string; status: string;
+}
+
+interface PendingTask {
+  id: string; title: string; subjectName: string; dueDate: string;
+}
 
 interface CFile {
   id: string; file_name: string; file_path: string; file_size: number | null;
@@ -33,6 +41,9 @@ export default function SubjectsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [classroomFilter, setClassroomFilter] = useState("all");
+  const [classroomStudents, setClassroomStudents] = useState<StudentInfo[]>([]);
+  const [classroomTasks, setClassroomTasks] = useState<PendingTask[]>([]);
+  const [loadingSidebar, setLoadingSidebar] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -150,8 +161,43 @@ export default function SubjectsPage() {
 
   const classrooms = useMemo(() => {
     const set = new Set(subjects.map((s) => s.classroomName));
-    return Array.from(set).sort();
+    return Array.from(set).sort((a, b) => {
+      const na = parseInt(a) || 0;
+      const nb = parseInt(b) || 0;
+      if (na !== nb) return na - nb;
+      return a.localeCompare(b);
+    });
   }, [subjects]);
+
+  const classroomIdMap = useMemo(() => {
+    const map = new Map<string, string>();
+    subjects.forEach((s) => { if (!map.has(s.classroomName)) map.set(s.classroomName, s.classroomId); });
+    return map;
+  }, [subjects]);
+
+  useEffect(() => {
+    if (classroomFilter === "all") { setClassroomStudents([]); setClassroomTasks([]); return; }
+    const cid = classroomIdMap.get(classroomFilter);
+    if (!cid) return;
+    setLoadingSidebar(true);
+    (async () => {
+      const [{ data: students }, { data: tasks }] = await Promise.all([
+        supabaseRef.current.from("students").select("id, first_name, last_name, status").eq("classroom_id", cid).eq("status", "active").order("last_name"),
+        supabaseRef.current.from("tasks").select("id, title, classroom_subject_id, due_date, classroom_subjects!inner(id, subjects!inner(name))").eq("classroom_subjects.classroom_id", cid).in("status", ["published"]).order("due_date", { ascending: true }),
+      ]);
+      setClassroomStudents((students || []).map((s) => {
+        const r = s as Record<string, unknown>;
+        return { id: r.id as string, name: `${r.first_name} ${r.last_name}`, status: r.status as string };
+      }));
+      setClassroomTasks((tasks || []).map((t) => {
+        const tr = t as Record<string, unknown>;
+        const cs = tr.classroom_subjects as Record<string, unknown>;
+        const sub = cs?.subjects as Record<string, unknown>;
+        return { id: tr.id as string, title: tr.title as string, subjectName: (sub?.name as string) || "", dueDate: tr.due_date as string };
+      }));
+      setLoadingSidebar(false);
+    })();
+  }, [classroomFilter, classroomIdMap]);
 
   const filtered = useMemo(() => {
     if (classroomFilter === "all") return subjects;
@@ -216,11 +262,14 @@ export default function SubjectsPage() {
         <EmptyState title="No hay materias asignadas" description="No tienes materias asignadas actualmente" icon={<BookOpen className="w-8 h-8" />} />
       ) : (
         <div className={cn(
-          "grid gap-4",
+          "gap-6",
           classroomFilter === "all"
-            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-            : "grid-cols-1"
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            : "flex flex-col lg:flex-row"
         )}>
+          <div className={cn(
+            classroomFilter === "all" ? "contents" : "flex-1 space-y-4"
+          )}>
           {filtered.map((subject) => {
             const isExpanded = expandedId === subject.classroomSubjectId;
             const color = getSubjectColor(subject.subjectName);
@@ -245,6 +294,76 @@ export default function SubjectsPage() {
               </SubjectCard>
             );
           })}
+          </div>
+
+          {classroomFilter !== "all" && (
+            <aside className="lg:w-80 xl:w-96 shrink-0">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100 sticky top-6">
+                <div className="p-5">
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-primary-500" />
+                    {classroomFilter}
+                  </h3>
+                  {loadingSidebar ? (
+                    <div className="space-y-3 mt-4">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="h-4 bg-slate-100 rounded animate-pulse" />
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-4 mt-3 text-sm">
+                        <span className="flex items-center gap-1 text-slate-500">
+                          <Users className="w-4 h-4" /> {classroomStudents.length} alumnos
+                        </span>
+                        <span className="flex items-center gap-1 text-amber-600">
+                          <Clock className="w-4 h-4" /> {classroomTasks.length} pendientes
+                        </span>
+                      </div>
+
+                      {classroomStudents.length > 0 && (
+                        <div className="mt-3 max-h-48 overflow-y-auto">
+                          {classroomStudents.map((s) => (
+                            <div key={s.id} className="flex items-center gap-2 py-1.5 text-sm text-slate-600">
+                              <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                              <span className="truncate">{s.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {!loadingSidebar && classroomTasks.length > 0 && (
+                  <div className="p-5">
+                    <h4 className="text-sm font-medium text-slate-500 mb-3 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
+                      Tareas pendientes por revisar
+                    </h4>
+                    <div className="space-y-2">
+                      {classroomTasks.map((t) => (
+                        <div key={t.id} className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                          <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                            <span>{t.subjectName}</span>
+                            <span>·</span>
+                            <span>{new Date(t.dueDate).toLocaleDateString("es-ES")}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!loadingSidebar && classroomTasks.length === 0 && (
+                  <div className="p-5 text-center text-sm text-slate-400">
+                    Sin tareas pendientes en este salón
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
         </div>
       )}
     </div>
