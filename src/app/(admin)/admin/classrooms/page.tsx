@@ -126,10 +126,10 @@ export default function ClassroomsPage() {
   return (
     <div>
       <PageHeader title="Salones" description="Gestionar salones" actionLabel="Nuevo Salón" onAction={() => handleOpenModal()} />
-      {loading ? null : classrooms.length === 0 ? (
+      {!loading && classrooms.length === 0 ? (
         <EmptyState title="No hay salones" description="Comienza creando el primer salón" actionLabel="Nuevo Salón" onAction={() => handleOpenModal()} />
       ) : (
-        <DataTable data={classrooms} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedClassroom(item); setDeleteDialogOpen(true); }} />
+        <DataTable isLoading={loading} data={classrooms} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedClassroom(item); setDeleteDialogOpen(true); }} />
       )}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedClassroom ? "Editar Salón" : "Nuevo Salón"} footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button onClick={handleSubmit} isLoading={isSubmitting}>{selectedClassroom ? "Guardar" : "Crear"}</Button></>}>
         <form onSubmit={handleSubmit} className="space-y-4">

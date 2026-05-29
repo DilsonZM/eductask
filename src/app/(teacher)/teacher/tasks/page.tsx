@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Modal, ConfirmDialog } from "@/components/ui/Modal";
@@ -573,7 +574,7 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {loading ? null : tasks.length === 0 ? (
+      {loading ? (<ShimmerTable rows={5} cols={4} />) : tasks.length === 0 ? (
         <EmptyState title="No hay tareas" description="Crea tu primera tarea" actionLabel="Nueva Tarea" onAction={() => handleOpenModal()} />
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">

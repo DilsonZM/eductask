@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 
 interface SchoolPeriod {
   id: string;
@@ -162,7 +163,7 @@ export default function GradesPage() {
         subjects.filter((s) => s.average > 0).length
       : 0;
 
-  if (authLoading || loading) return null;
+  if (authLoading || loading) return <ShimmerTable rows={5} cols={4} />;
 
   if (subjects.length === 0) {
     return (

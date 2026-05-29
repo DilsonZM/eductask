@@ -19,7 +19,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMinDone(true), 2500);
+    const timer = setTimeout(() => setMinDone(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 

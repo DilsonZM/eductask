@@ -6,6 +6,7 @@ import { StatsCard } from "@/components/common/StatsCard";
 import { NewsCarousel } from "@/components/common/NewsCarousel";
 import { formatDate } from "@/lib/utils";
 import { Users, UserCog, Building2, Calendar } from "lucide-react";
+import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 
 interface DashboardStats {
   totalStudents: number;
@@ -91,7 +92,18 @@ export default function AdminDashboard() {
     };
   }, [fetchData]);
 
-  if (loading) return null;
+  if (loading) return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (<ShimmerCard key={i} />))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ShimmerCard />
+        <ShimmerCard />
+        <ShimmerTable rows={4} cols={1} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { DataTable } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Modal, ConfirmDialog } from "@/components/ui/Modal";
@@ -255,7 +256,7 @@ export default function SubjectsPage() {
         actionLabel="Nueva Materia"
         onAction={() => handleOpenModal()}
       />
-      {loading ? null : subjects.length === 0 ? (
+      {loading ? (<ShimmerGrid count={6} />) : subjects.length === 0 ? (
         <EmptyState
           title="No hay materias"
           description="Comienza creando la primera materia"

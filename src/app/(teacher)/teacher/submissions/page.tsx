@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
@@ -262,7 +263,7 @@ export default function SubmissionsPage() {
     <div className="space-y-6">
       <PageHeader title="Entregas" description="Revisar y calificar entregas de los alumnos" />
 
-      {loadingTasks ? null : tasks.length === 0 ? (
+      {loadingTasks ? (<ShimmerTable rows={5} cols={4} />) : tasks.length === 0 ? (
         <EmptyState
           title="No hay tareas publicadas"
           description="Publica una tarea primero para ver sus entregas aquí"
@@ -298,7 +299,7 @@ export default function SubmissionsPage() {
             </div>
           </div>
 
-          {loadingSubmissions ? null : submissions.length === 0 && nonSubmitters.length === 0 ? (
+          {loadingSubmissions ? (<ShimmerTable rows={5} cols={4} />) : submissions.length === 0 && nonSubmitters.length === 0 ? (
             <div className="p-6">
               <EmptyState title="Sin datos" description="No se encontraron estudiantes en este curso" />
             </div>

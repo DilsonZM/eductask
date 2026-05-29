@@ -153,7 +153,7 @@ export default function StudentsPage() {
         onAction={() => handleOpenModal()}
       />
 
-      {loading ? null : students.length === 0 ? (
+      {!loading && students.length === 0 ? (
         <EmptyState
           title="No hay alumnos"
           description="Comienza agregando el primer alumno"
@@ -161,7 +161,7 @@ export default function StudentsPage() {
           onAction={() => handleOpenModal()}
         />
       ) : (
-        <DataTable
+        <DataTable isLoading={loading}
           data={students}
           columns={columns}
           onEdit={handleOpenModal}

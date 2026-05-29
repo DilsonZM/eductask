@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { Select } from "@/components/ui/Select";
 import toast from "react-hot-toast";
 import type { Tables } from "@/types/database";
@@ -419,7 +420,7 @@ export default function GradesPage() {
         description="Gestiona las notas de tus alumnos por aula, materia y periodo"
       />
 
-      {loadingTeacher || loadingClassrooms || loadingPeriods ? null : classrooms.length === 0 ? (
+      {loadingTeacher || loadingClassrooms || loadingPeriods ? (<ShimmerTable rows={5} cols={4} />) : classrooms.length === 0 ? (
         <EmptyState
           title="No tienes aulas asignadas"
           description="Contacta al administrador para que te asigne aulas y materias"
@@ -453,7 +454,7 @@ export default function GradesPage() {
 
       {showTable && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          {loadingGrades ? null : gradeRows.length === 0 ? (
+          {loadingGrades ? (<ShimmerTable rows={5} cols={5} />) : gradeRows.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 title="Sin estudiantes"

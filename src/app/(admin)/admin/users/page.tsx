@@ -153,7 +153,7 @@ export default function UsersPage() {
         onAction={() => handleOpenModal()}
       />
 
-      {loading ? null : users.length === 0 ? (
+      {!loading && users.length === 0 ? (
         <EmptyState
           title="No hay usuarios"
           description="Comienza creando el primer usuario"
@@ -161,7 +161,7 @@ export default function UsersPage() {
           onAction={() => handleOpenModal()}
         />
       ) : (
-        <DataTable
+        <DataTable isLoading={loading}
           data={users}
           columns={columns}
           onEdit={handleOpenModal}

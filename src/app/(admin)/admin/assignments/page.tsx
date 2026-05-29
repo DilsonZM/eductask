@@ -154,10 +154,10 @@ export default function AssignmentsPage() {
   return (
     <div>
       <PageHeader title="Asignaciones" description="Asignar profesores a materias y salones" actionLabel="Nueva Asignación" onAction={() => handleOpenModal()} />
-      {loading ? null : assignments.length === 0 ? (
+      {!loading && assignments.length === 0 ? (
         <EmptyState title="No hay asignaciones" description="Comienza creando la primera asignación" actionLabel="Nueva Asignación" onAction={() => handleOpenModal()} />
       ) : (
-        <DataTable data={assignments} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedAssignment(item); setDeleteDialogOpen(true); }} />
+        <DataTable isLoading={loading} data={assignments} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedAssignment(item); setDeleteDialogOpen(true); }} />
       )}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedAssignment ? "Editar Asignación" : "Nueva Asignación"} footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button onClick={handleSubmit} isLoading={isSubmitting}>{selectedAssignment ? "Guardar" : "Crear"}</Button></>}>
         <form onSubmit={handleSubmit} className="space-y-4">

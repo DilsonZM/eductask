@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Select } from "@/components/ui/Select";
@@ -140,7 +141,7 @@ export default function TeacherSchedulePage() {
           title="Sin horarios asignados"
           description="No tienes salones asignados aún"
         />
-      ) : loading ? null : schedules.length === 0 ? (
+      ) : loading ? (<ShimmerTable rows={8} cols={6} />) : schedules.length === 0 ? (
         <EmptyState
           title="Sin horarios"
           description="Este salón no tiene horarios configurados"

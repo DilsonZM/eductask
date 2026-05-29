@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
@@ -257,7 +258,7 @@ export default function SchedulesPage() {
           title="Selecciona un salón"
           description="Elige un salón para ver su horario semanal"
         />
-      ) : loading ? null : schedules.length === 0 ? (
+      ) : loading ? (<ShimmerTable rows={8} cols={6} />) : schedules.length === 0 ? (
         <EmptyState
           title="Sin horarios"
           description="Este salón no tiene horarios asignados"

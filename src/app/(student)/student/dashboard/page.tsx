@@ -8,6 +8,7 @@ import { NewsCarousel } from "@/components/common/NewsCarousel";
 import { DashboardCalendar, CalendarEvent } from "@/components/common/DashboardCalendar";
 import { formatDate } from "@/lib/utils";
 import { BookOpen, FileText, Clock, Award, Calendar } from "lucide-react";
+import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 import Link from "next/link";
 
 interface NewsItem { id: string; title: string; excerpt: string | null; image: string | null; published_at: string | null; }
@@ -151,7 +152,18 @@ export default function StudentDashboard() {
     return result;
   }, [tasksWithMeta, events, news]);
 
-  if (authLoading || loading) return null;
+  if (authLoading || loading) return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (<ShimmerCard key={i} />))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ShimmerCard />
+        <ShimmerCard />
+        <ShimmerTable rows={4} cols={1} />
+      </div>
+    </div>
+  );
 
   const statusBadge = (task: TaskWithMeta) => {
     if (task.studentStatus === "graded") {

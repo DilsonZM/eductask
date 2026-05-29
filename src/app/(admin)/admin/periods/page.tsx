@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { DataTable } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Modal, ConfirmDialog } from "@/components/ui/Modal";
@@ -169,7 +170,7 @@ export default function PeriodsPage() {
         actionLabel="Nuevo Período"
         onAction={() => handleOpenModal()}
       />
-      {loading ? null : periods.length === 0 ? (
+      {loading ? (<ShimmerGrid count={4} />) : periods.length === 0 ? (
         <EmptyState
           title="No hay períodos"
           description="Comienza creando el primer período"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { formatDate } from "@/lib/utils";
@@ -340,7 +341,7 @@ export default function AdminReportsPage() {
     [selectedClassroomData, selectedPeriodData, subjects, academicYear]
   );
 
-  if (loading) return null;
+  if (loading) return <ShimmerTable rows={6} cols={4} />;
 
   return (
     <div className="space-y-6">

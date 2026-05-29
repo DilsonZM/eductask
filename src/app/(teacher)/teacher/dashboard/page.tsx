@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { StatsCard } from "@/components/common/StatsCard";
 import { DashboardCalendar, CalendarEvent } from "@/components/common/DashboardCalendar";
 import { formatDate } from "@/lib/utils";
+import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 import { BookOpen, CheckSquare, FileText, Users } from "lucide-react";
 import Link from "next/link";
 
@@ -154,7 +155,18 @@ export default function TeacherDashboard() {
     return result;
   }, [recentTasks, events, news]);
 
-  if (loading) return null;
+  if (loading) return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (<ShimmerCard key={i} />))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ShimmerCard />
+        <ShimmerCard />
+        <ShimmerTable rows={4} cols={1} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
