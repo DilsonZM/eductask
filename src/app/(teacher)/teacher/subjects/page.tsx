@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { SubjectCard, getSubjectColor } from "@/components/common/SubjectCard";
 import { CurriculumView } from "@/components/common/CurriculumView";
-import { Select } from "@/components/ui/Select";
+import { cn } from "@/lib/utils";
 import { BookOpen } from "lucide-react";
 
 interface CFile {
@@ -180,12 +180,34 @@ export default function SubjectsPage() {
       </div>
 
       {classrooms.length > 1 && (
-        <Select
-          label="Filtrar por salón"
-          value={classroomFilter}
-          onChange={(e) => setClassroomFilter(e.target.value)}
-          options={[{ value: "all", label: "Todos los salones" }, ...classrooms.map((c) => ({ value: c, label: c }))]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-500 mr-1">Salón:</span>
+          <button
+            onClick={() => setClassroomFilter("all")}
+            className={cn(
+              "px-3 py-1 rounded-lg text-sm font-medium transition-all",
+              classroomFilter === "all"
+                ? "bg-primary-500 text-white shadow-sm"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            )}
+          >
+            Todos
+          </button>
+          {classrooms.map((c) => (
+            <button
+              key={c}
+              onClick={() => setClassroomFilter(c)}
+              className={cn(
+                "px-3 py-1 rounded-lg text-sm font-medium transition-all",
+                classroomFilter === c
+                  ? "bg-primary-500 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
       )}
 
       {loading ? (
@@ -193,7 +215,12 @@ export default function SubjectsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState title="No hay materias asignadas" description="No tienes materias asignadas actualmente" icon={<BookOpen className="w-8 h-8" />} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={cn(
+          "grid gap-4",
+          classroomFilter === "all"
+            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            : "grid-cols-1"
+        )}>
           {filtered.map((subject) => {
             const isExpanded = expandedId === subject.classroomSubjectId;
             const color = getSubjectColor(subject.subjectName);
