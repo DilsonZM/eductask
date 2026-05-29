@@ -95,7 +95,10 @@ export function RichTextEditor({
   }) => (
     <button
       type="button"
-      onClick={onClick}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
       title={title}
       className={`p-1.5 rounded hover:bg-slate-100 transition ${
         active ? "bg-slate-200 text-primary-700" : "text-slate-600"
