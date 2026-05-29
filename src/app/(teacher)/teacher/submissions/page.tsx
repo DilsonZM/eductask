@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { Save, ExternalLink, Clock, AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type TaskOption = {
   id: string;
@@ -69,11 +70,10 @@ export default function SubmissionsPage() {
         .select("*, classroom_subjects!inner(id, classroom_id, subjects!inner(name))")
         .eq("teacher_id", teacher.id)
         .in("status", ["published", "closed"])
-        .order("due_date", { ascending: false });
+        .order("due_date", { ascending: true });
 
       if (tasksData) {
-        setTasks(
-          tasksData.map((t: Record<string, unknown>) => {
+        const mapped = tasksData.map((t: Record<string, unknown>) => {
             const cs = t.classroom_subjects as Record<string, unknown>;
             const subjects = cs?.subjects as Record<string, unknown>;
             return {
@@ -85,8 +85,11 @@ export default function SubmissionsPage() {
               classroom_subject_id: t.classroom_subject_id as string,
               classroom_id: (cs?.classroom_id as string) || "",
             };
-          })
-        );
+          });
+        setTasks(mapped);
+        if (mapped.length > 0) {
+          setSelectedTaskId(mapped[0].id);
+        }
       }
     } catch (error) {
       console.error("Error loading tasks:", error);
@@ -98,6 +101,13 @@ export default function SubmissionsPage() {
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  useEffect(() => {
+    if (selectedTaskId && tasks.length > 0) {
+      const task = tasks.find((t) => t.id === selectedTaskId);
+      if (task) loadSubmissions(task);
+    }
+  }, [selectedTaskId, tasks, loadSubmissions]);
 
   const selectedTaskData = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) || null,
@@ -269,13 +279,27 @@ export default function SubmissionsPage() {
           description="Publica una tarea primero para ver sus entregas aquí"
         />
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <Select
-            label="Seleccionar tarea"
-            options={taskOptions}
-            value={selectedTaskId}
-            onChange={(e) => handleTaskChange(e.target.value)}
-          />
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-slate-600 mr-1">Tarea:</span>
+            {tasks.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => handleTaskChange(t.id)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-sm transition-all text-left max-w-xs truncate",
+                  selectedTaskId === t.id
+                    ? "bg-primary-500 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                )}
+              >
+                {t.title}
+                <span className={cn("block text-xs mt-0.5", selectedTaskId === t.id ? "text-primary-100" : "text-slate-400")}>
+                  {t.subject_name} · {new Date(t.due_date).toLocaleDateString("es-ES")}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

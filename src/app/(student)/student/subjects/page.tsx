@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { SubjectCard, getSubjectColor } from "@/components/common/SubjectCard";
 import { CurriculumView } from "@/components/common/CurriculumView";
+import { cn } from "@/lib/utils";
 import { BookOpen } from "lucide-react";
 
 interface CFile {
@@ -30,6 +31,7 @@ export default function SubjectsPage() {
   const [periods, setPeriods] = useState<SchoolPeriod[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subjectFilter, setSubjectFilter] = useState("all");
 
   const fetchData = useCallback(async () => {
     const supabase = supabaseRef.current;
@@ -110,12 +112,22 @@ export default function SubjectsPage() {
 
   const toggleExpand = (id: string) => setExpandedId((prev) => (prev === id ? null : id));
 
+  const filtered = useMemo(() => {
+    if (subjectFilter === "all") return subjects;
+    return subjects.filter((s) => s.name === subjectFilter);
+  }, [subjects, subjectFilter]);
+
+  const subjectNames = useMemo(() => {
+    const set = new Set(subjects.map((s) => s.name));
+    return Array.from(set).sort();
+  }, [subjects]);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-serif">Materias</h1>
         <p className="text-sm text-slate-500 mt-2 flex flex-wrap items-center gap-3">
-          <span className="flex items-center gap-1"><BookOpen className="w-4 h-4" /> {subjects.length} materias</span>
+          <span className="flex items-center gap-1"><BookOpen className="w-4 h-4" /> {filtered.length} materias</span>
           <span className="text-slate-300">|</span>
           <span>{periods.length} períodos</span>
           <span className="text-slate-300">|</span>
@@ -124,13 +136,45 @@ export default function SubjectsPage() {
         </p>
       </div>
 
+      {subjectNames.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-500 mr-1">Materia:</span>
+          <button
+            onClick={() => setSubjectFilter("all")}
+            className={cn(
+              "px-3 py-1 rounded-lg text-sm font-medium transition-all",
+              subjectFilter === "all" ? "bg-primary-500 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            )}
+          >
+            Todas
+          </button>
+          {subjectNames.map((n) => (
+            <button
+              key={n}
+              onClick={() => setSubjectFilter(n)}
+              className={cn(
+                "px-3 py-1 rounded-lg text-sm font-medium transition-all",
+                subjectFilter === n ? "bg-primary-500 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <ShimmerGrid count={6} />
-      ) : subjects.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <EmptyState title="No hay materias" description="No tienes materias asignadas en tu curso" icon={<BookOpen className="w-8 h-8" />} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {subjects.map((subject) => {
+        <div className={cn(
+          "grid gap-4",
+          subjectFilter === "all"
+            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            : "grid-cols-1"
+        )}>
+          {filtered.map((subject) => {
             const isExpanded = expandedId === subject.id;
             const color = getSubjectColor(subject.name);
 
