@@ -339,3 +339,45 @@ CREATE POLICY "Auth read users" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Auth read classrooms" ON public.classrooms FOR SELECT USING (true);
 CREATE POLICY "Auth read subjects" ON public.subjects FOR SELECT USING (true);
 CREATE POLICY "Auth read schedules" ON public.schedules FOR SELECT USING (true);
+
+-- ============================================================
+-- ÍNDICES DE OPTIMIZACIÓN
+-- ============================================================
+
+-- Críticos (alto impacto en rendimiento):
+-- 1. teachers.user_id: cada página de profesor consulta por user_id
+CREATE INDEX idx_teachers_user_id ON public.teachers(user_id);
+
+-- 2. tasks(teacher_id, status): dashboard y listado de tareas filtran por profesor + estado
+CREATE INDEX idx_tasks_teacher_status ON public.tasks(teacher_id, status);
+
+-- 3. tasks.classroom_subject_id: filtrado de tareas por materia/asignación
+CREATE INDEX idx_tasks_classroom_subject ON public.tasks(classroom_subject_id);
+
+-- 4. students(classroom_id, status): conteo de alumnos activos por salón
+CREATE INDEX idx_students_classroom_status ON public.students(classroom_id, status);
+
+-- 5. submissions(task_id, score): conteo de entregas pendientes sin calificar
+CREATE INDEX idx_submissions_task_score ON public.submissions(task_id, score);
+
+-- 6. teacher_assignments.teacher_id: dashboard del profesor consulta sus asignaciones
+CREATE INDEX idx_teacher_assignments_teacher ON public.teacher_assignments(teacher_id);
+
+-- Secundarios (rendimiento general):
+-- 7. events.start_date: dashboards filtran eventos futuros
+CREATE INDEX idx_events_start_date ON public.events(start_date);
+
+-- 8. news(is_published, published_at DESC): news carousel en todos los dashboards
+CREATE INDEX idx_news_published ON public.news(is_published, published_at DESC);
+
+-- 9. classroom_subjects.classroom_id: materias por salón (tareas, filtros)
+CREATE INDEX idx_classroom_subjects_classroom ON public.classroom_subjects(classroom_id);
+
+-- 10. academic_years.is_active: carga de año lectivo activo
+CREATE INDEX idx_academic_years_active ON public.academic_years(is_active);
+
+-- 11. school_periods(academic_year_id, status): períodos activos por año lectivo
+CREATE INDEX idx_school_periods_year_status ON public.school_periods(academic_year_id, status);
+
+-- 12. task_attachments.task_id: archivos adjuntos de tareas
+CREATE INDEX idx_task_attachments_task ON public.task_attachments(task_id);

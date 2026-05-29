@@ -456,6 +456,8 @@ export interface Database {
           file_name: string;
           submitted_at: string;
           comments: string | null;
+          score: number | null;
+          teacher_comment: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -467,6 +469,8 @@ export interface Database {
           file_name: string;
           submitted_at?: string;
           comments?: string | null;
+          score?: number | null;
+          teacher_comment?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -478,6 +482,8 @@ export interface Database {
           file_name?: string;
           submitted_at?: string;
           comments?: string | null;
+          score?: number | null;
+          teacher_comment?: string | null;
           created_at?: string;
           updated_at?: string;
         };
