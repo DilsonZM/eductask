@@ -301,6 +301,61 @@ export interface Database {
           updated_at?: string;
         };
       };
+      curriculum_entries: {
+        Row: {
+          id: string;
+          classroom_subject_id: string | null;
+          school_period_id: string | null;
+          content: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          classroom_subject_id?: string | null;
+          school_period_id?: string | null;
+          content: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          classroom_subject_id?: string | null;
+          school_period_id?: string | null;
+          content?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      curriculum_files: {
+        Row: {
+          id: string;
+          curriculum_entry_id: string;
+          file_name: string;
+          file_path: string;
+          file_size: number | null;
+          content_type: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          curriculum_entry_id: string;
+          file_name: string;
+          file_path: string;
+          file_size?: number | null;
+          content_type?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          curriculum_entry_id?: string;
+          file_name?: string;
+          file_path?: string;
+          file_size?: number | null;
+          content_type?: string | null;
+          created_at?: string;
+        };
+      };
       teacher_assignments: {
         Row: {
           id: string;

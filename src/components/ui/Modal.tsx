@@ -9,13 +9,16 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 export function Modal({ isOpen, onClose, title, children, footer, size = "md" }: ModalProps) {
   if (!isOpen) return null;
 
-  const sizeClass = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-lg";
+  const sizeClass =
+    size === "xl" ? "max-w-4xl" :
+    size === "lg" ? "max-w-2xl" :
+    size === "sm" ? "max-w-sm" : "max-w-lg";
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">

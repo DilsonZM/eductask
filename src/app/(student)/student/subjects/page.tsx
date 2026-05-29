@@ -8,13 +8,20 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { BookOpen, ChevronDown } from "lucide-react";
 
+interface CFile {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+}
+
 interface SubjectData {
   id: string;
   name: string;
   code: string;
   credits: number;
   classroomSubjectId: string;
-  curriculum: Record<string, string | null>;
+  curriculum: Record<string, { content: string | null; files: CFile[] }>;
 }
 
 interface SchoolPeriod {
@@ -81,19 +88,40 @@ export default function SubjectsPage() {
       const classroomSubjects = csRows || [];
       const csIds = classroomSubjects.map((r) => r.id);
 
-      const curriculumMap: Record<string, Record<string, string | null>> = {};
+      const curriculumMap: Record<string, Record<string, { content: string | null; files: CFile[]; entryId: string }>> = {};
 
       if (csIds.length > 0) {
         const { data: entries } = await supabase
           .from("curriculum_entries")
-          .select("classroom_subject_id, school_period_id, content")
+          .select("id, classroom_subject_id, school_period_id, content")
           .in("classroom_subject_id", csIds);
+
+        const entryIds = (entries || []).map((e) => e.id);
+        const { data: filesData } =
+          entryIds.length > 0
+            ? await supabase.from("curriculum_files").select("*").in("curriculum_entry_id", entryIds)
+            : { data: [] };
+
+        const filesMap = new Map<string, CFile[]>();
+        (filesData || []).forEach((f) => {
+          if (!filesMap.has(f.curriculum_entry_id)) filesMap.set(f.curriculum_entry_id, []);
+          filesMap.get(f.curriculum_entry_id)!.push({
+            id: f.id,
+            file_name: f.file_name,
+            file_path: f.file_path,
+            file_size: f.file_size,
+          });
+        });
 
         (entries || []).forEach((entry) => {
           if (!curriculumMap[entry.classroom_subject_id]) {
             curriculumMap[entry.classroom_subject_id] = {};
           }
-          curriculumMap[entry.classroom_subject_id][entry.school_period_id] = entry.content;
+          curriculumMap[entry.classroom_subject_id][entry.school_period_id] = {
+            content: entry.content,
+            files: filesMap.get(entry.id) || [],
+            entryId: entry.id,
+          };
         });
       }
 
@@ -187,18 +215,37 @@ export default function SubjectsPage() {
                 >
                   <div className="px-6 pb-6 space-y-3">
                     {periods.map((period) => {
-                      const content = subject.curriculum[period.id];
+                      const data = subject.curriculum[period.id];
                       return (
                         <div key={period.id} className="bg-slate-50 rounded-lg p-3">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
                             {period.name}
                           </p>
-                          {content ? (
-                            <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                              {content}
-                            </p>
+                          {data?.content ? (
+                            <div
+                              className="text-sm text-slate-700 prose prose-sm max-w-none prose-headings:text-slate-800 prose-a:text-primary-600"
+                              dangerouslySetInnerHTML={{ __html: data.content }}
+                            />
                           ) : (
                             <p className="text-sm text-slate-400 italic">Pendiente</p>
+                          )}
+                          {data?.files && data.files.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {data.files.map((f) => (
+                                <a
+                                  key={f.id}
+                                  href={f.file_path}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  {f.file_name}
+                                </a>
+                              ))}
+                            </div>
                           )}
                         </div>
                       );

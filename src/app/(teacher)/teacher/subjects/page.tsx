@@ -12,6 +12,7 @@ interface PeriodCurriculum {
   periodName: string;
   order: number;
   content: string | null;
+  files: { id: string; file_name: string; file_path: string; file_size: number | null }[];
 }
 
 interface SubjectCardData {
@@ -150,25 +151,54 @@ export default function SubjectsPage() {
               .in("classroom_subject_id", csIds)
           : { data: [] };
 
-      const entriesMap = new Map<string, Map<string, string>>();
+      const entryIds = (entries || []).map((e) => (e as Record<string, unknown>).id as string);
+      const { data: filesData } =
+        entryIds.length > 0
+          ? await supabaseRef.current
+              .from("curriculum_files")
+              .select("*")
+              .in("curriculum_entry_id", entryIds)
+          : { data: [] };
+
+      const filesMap = new Map<string, { id: string; file_name: string; file_path: string; file_size: number | null }[]>();
+      (filesData || []).forEach((f) => {
+        const fr = f as Record<string, unknown>;
+        const eId = fr.curriculum_entry_id as string;
+        if (!filesMap.has(eId)) filesMap.set(eId, []);
+        filesMap.get(eId)!.push({
+          id: fr.id as string,
+          file_name: fr.file_name as string,
+          file_path: fr.file_path as string,
+          file_size: fr.file_size as number | null,
+        });
+      });
+
+      const entriesMap = new Map<string, Map<string, { content: string; entryId: string }>>();
       (entries || []).forEach((e) => {
         const er = e as Record<string, unknown>;
         const csId = er.classroom_subject_id as string;
         const periodId = er.school_period_id as string;
         if (!entriesMap.has(csId)) entriesMap.set(csId, new Map());
-        entriesMap.get(csId)!.set(periodId, er.content as string);
+        entriesMap.get(csId)!.set(periodId, {
+          content: er.content as string,
+          entryId: er.id as string,
+        });
       });
 
       const result: SubjectCardData[] = deduped.map((d) => {
         const sub = subjectMap.get(d.subjectId) as
           | { name: string; code: string; credits: number }
           | undefined;
-        const periodCurriculums: PeriodCurriculum[] = periods.map((p) => ({
-          periodId: p.id,
-          periodName: p.name,
-          order: p.order,
-          content: entriesMap.get(d.classroomSubjectId)?.get(p.id) ?? null,
-        }));
+        const periodCurriculums: PeriodCurriculum[] = periods.map((p) => {
+          const entry = entriesMap.get(d.classroomSubjectId)?.get(p.id);
+          return {
+            periodId: p.id,
+            periodName: p.name,
+            order: p.order,
+            content: entry?.content ?? null,
+            files: entry ? filesMap.get(entry.entryId) || [] : [],
+          };
+        });
         return {
           classroomSubjectId: d.classroomSubjectId,
           assignmentId: d.assignmentId,
@@ -246,9 +276,37 @@ export default function SubjectsPage() {
                           <h4 className="font-medium text-slate-800 text-sm">
                             {p.periodName}
                           </h4>
-                          <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">
-                            {p.content || "Pendiente"}
-                          </p>
+                          {p.content ? (
+                            <div
+                              className="text-sm text-slate-600 mt-1 prose prose-sm max-w-none prose-headings:text-slate-800 prose-a:text-primary-600"
+                              dangerouslySetInnerHTML={{ __html: p.content }}
+                            />
+                          ) : (
+                            <p className="text-sm text-slate-400 mt-1">Pendiente</p>
+                          )}
+                          {p.files.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {p.files.map((f) => (
+                                <a
+                                  key={f.id}
+                                  href={f.file_path}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  {f.file_name}
+                                  {f.file_size != null && (
+                                    <span className="text-slate-400">
+                                      ({f.file_size < 1024 ? `${f.file_size} B` : `${(f.file_size / 1024).toFixed(1)} KB`})
+                                    </span>
+                                  )}
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : (

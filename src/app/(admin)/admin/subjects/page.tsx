@@ -10,16 +10,26 @@ import { Modal, ConfirmDialog } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { RichTextEditor } from "@/components/common/RichTextEditor";
 import type { Tables } from "@/types/database";
 import toast from "react-hot-toast";
 
 type Subject = Tables<"subjects">;
+
+interface CurriculumFile {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  content_type: string | null;
+}
 
 interface CurriculumEntry {
   periodId: string;
   periodName: string;
   content: string;
   entryId?: string;
+  files: CurriculumFile[];
 }
 
 export default function SubjectsPage() {
@@ -84,6 +94,7 @@ export default function SubjectsPage() {
           periodId: p.id,
           periodName: p.name,
           content: "",
+          files: [],
         }));
 
         const { data: csData } = await supabaseRef.current
@@ -100,11 +111,28 @@ export default function SubjectsPage() {
             .eq("classroom_subject_id", csData.id);
 
           if (curData) {
+            const entryIds = curData.map((c) => c.id);
+            const { data: filesData } = await supabaseRef.current
+              .from("curriculum_files")
+              .select("*")
+              .in("curriculum_entry_id", entryIds);
+
             curData.forEach((c) => {
               const idx = entries.findIndex((e) => e.periodId === c.school_period_id);
               if (idx >= 0) {
                 entries[idx].content = c.content || "";
                 entries[idx].entryId = c.id;
+                if (filesData) {
+                  entries[idx].files = filesData
+                    .filter((f) => f.curriculum_entry_id === c.id)
+                    .map((f) => ({
+                      id: f.id,
+                      file_name: f.file_name,
+                      file_path: f.file_path,
+                      file_size: f.file_size,
+                      content_type: f.content_type,
+                    }));
+                }
               }
             });
           }
@@ -117,6 +145,128 @@ export default function SubjectsPage() {
       }
     },
     [periods]
+  );
+
+  const handleFileUpload = useCallback(
+    async (entryIdx: number) => {
+      const entry = curriculumEntries[entryIdx];
+      if (!entry.entryId) {
+        // Create entry first
+        const { data: csData } = await supabaseRef.current
+          .from("classroom_subjects")
+          .select("id")
+          .eq("classroom_id", temarioClassroom)
+          .eq("subject_id", temarioSubject)
+          .single();
+
+        let csId = csData?.id;
+        if (!csId) {
+          const { data: newCs } = await supabaseRef.current
+            .from("classroom_subjects")
+            .insert({ classroom_id: temarioClassroom, subject_id: temarioSubject })
+            .select("id")
+            .single();
+          if (newCs) csId = newCs.id;
+        }
+
+        if (!csId) {
+          toast.error("Error al crear la entrada");
+          return null;
+        }
+
+        const { data: newEntry } = await supabaseRef.current
+          .from("curriculum_entries")
+          .insert({
+            classroom_subject_id: csId,
+            school_period_id: entry.periodId,
+            content: entry.content.trim() || " ",
+          })
+          .select("id")
+          .single();
+
+        if (newEntry) {
+          const updated = [...curriculumEntries];
+          updated[entryIdx].entryId = newEntry.id;
+          setCurriculumEntries(updated);
+          return newEntry.id;
+        }
+        return null;
+      }
+      return entry.entryId;
+    },
+    [curriculumEntries, temarioClassroom, temarioSubject]
+  );
+
+  const handleUploadFile = useCallback(
+    (entryIdx: number) => async (file: File) => {
+      const entryId = await handleFileUpload(entryIdx);
+      if (!entryId) {
+        toast.error("Error al preparar la carga");
+        return;
+      }
+
+      const path = `curriculum/${entryId}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabaseRef.current.storage
+        .from("curriculum-files")
+        .upload(path, file);
+
+      if (uploadError) {
+        toast.error("Error al subir archivo");
+        return;
+      }
+
+      const { data: urlData } = supabaseRef.current.storage
+        .from("curriculum-files")
+        .getPublicUrl(path);
+
+      const { data: fileRecord } = await supabaseRef.current
+        .from("curriculum_files")
+        .insert({
+          curriculum_entry_id: entryId,
+          file_name: file.name,
+          file_path: urlData.publicUrl,
+          file_size: file.size,
+          content_type: file.type,
+        })
+        .select("*")
+        .single();
+
+      if (fileRecord) {
+        const updated = [...curriculumEntries];
+        updated[entryIdx].files = [
+          ...updated[entryIdx].files,
+          {
+            id: fileRecord.id,
+            file_name: fileRecord.file_name,
+            file_path: fileRecord.file_path,
+            file_size: fileRecord.file_size,
+            content_type: fileRecord.content_type,
+          },
+        ];
+        setCurriculumEntries(updated);
+        toast.success("Archivo subido");
+      }
+    },
+    [handleFileUpload, curriculumEntries]
+  );
+
+  const handleDeleteFile = useCallback(
+    async (entryIdx: number, fileId: string) => {
+      const file = curriculumEntries[entryIdx].files.find((f) => f.id === fileId);
+      if (!file) return;
+
+      const path = file.file_path.split("/curriculum-files/")[1]?.split("?")[0];
+      if (path) {
+        await supabaseRef.current.storage.from("curriculum-files").remove([decodeURIComponent(path)]);
+      }
+
+      await supabaseRef.current.from("curriculum_files").delete().eq("id", fileId);
+
+      const updated = [...curriculumEntries];
+      updated[entryIdx].files = updated[entryIdx].files.filter((f) => f.id !== fileId);
+      setCurriculumEntries(updated);
+    },
+    [curriculumEntries]
   );
 
   const openTemario = (subject: Subject) => {
@@ -283,75 +433,78 @@ export default function SubjectsPage() {
         />
       )}
 
-      <Modal
-        isOpen={temarioOpen}
-        onClose={() => setTemarioOpen(false)}
-        title={`Temario: ${selectedSubject?.name || ""}`}
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setTemarioOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveTemario} isLoading={savingTemario}>
-              Guardar Temario
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Select
-            label="Salón"
-            value={temarioClassroom}
-            onChange={(e) => {
-              setTemarioClassroom(e.target.value);
-              if (e.target.value) loadTemario(temarioSubject, e.target.value);
-            }}
-            options={[
-              { value: "", label: "Seleccionar salón..." },
-              ...classrooms.map((c) => ({ value: c.id, label: c.name })),
-            ]}
-          />
+        <Modal
+          isOpen={temarioOpen}
+          onClose={() => setTemarioOpen(false)}
+          title={`Temario: ${selectedSubject?.name || ""}`}
+          size="xl"
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setTemarioOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveTemario} isLoading={savingTemario}>
+                Guardar Temario
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Select
+              label="Salón"
+              value={temarioClassroom}
+              onChange={(e) => {
+                setTemarioClassroom(e.target.value);
+                if (e.target.value) loadTemario(temarioSubject, e.target.value);
+              }}
+              options={[
+                { value: "", label: "Seleccionar salón..." },
+                ...classrooms.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
 
-          {temarioClassroom && loadingTemario && (
-            <p className="text-sm text-slate-500 text-center py-4">
-              Cargando temario...
-            </p>
-          )}
+            {temarioClassroom && loadingTemario && (
+              <p className="text-sm text-slate-500 text-center py-8">
+                Cargando temario...
+              </p>
+            )}
 
-          {temarioClassroom && !loadingTemario && (
-            <div className="space-y-3">
-              {curriculumEntries.map((entry, idx) => (
-                <div
-                  key={entry.periodId}
-                  className="border border-slate-200 rounded-xl p-4"
-                >
-                  <h4 className="text-sm font-semibold text-slate-900 mb-2">
-                    {idx + 1}. {entry.periodName}
-                  </h4>
-                  <textarea
-                    value={entry.content}
-                    onChange={(e) => {
-                      const updated = [...curriculumEntries];
-                      updated[idx].content = e.target.value;
-                      setCurriculumEntries(updated);
-                    }}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    placeholder={`Contenido temático para ${entry.periodName.toLowerCase()}...`}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+            {temarioClassroom && !loadingTemario && (
+              <div className="space-y-6">
+                {curriculumEntries.map((entry, idx) => (
+                  <div
+                    key={entry.periodId}
+                    className="border border-slate-200 rounded-xl overflow-hidden"
+                  >
+                    <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                      <h4 className="text-sm font-semibold text-slate-900">
+                        {idx + 1}. {entry.periodName}
+                      </h4>
+                    </div>
+                    <RichTextEditor
+                      content={entry.content}
+                      onChange={(html) => {
+                        const updated = [...curriculumEntries];
+                        updated[idx].content = html;
+                        setCurriculumEntries(updated);
+                      }}
+                      placeholder={`Escribe el contenido temático para ${entry.periodName.toLowerCase()}...`}
+                      files={entry.files}
+                      onFileUpload={handleUploadFile(idx)}
+                      onFileDelete={(fileId) => handleDeleteFile(idx, fileId)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
-          {!temarioClassroom && (
-            <p className="text-sm text-slate-400 text-center py-4">
-              Seleccione un salón para editar el temario de esta materia
-            </p>
-          )}
-        </div>
-      </Modal>
+            {!temarioClassroom && (
+              <p className="text-sm text-slate-400 text-center py-8">
+                Seleccione un salón para editar el temario de esta materia
+              </p>
+            )}
+          </div>
+        </Modal>
 
       <Modal
         isOpen={modalOpen}

@@ -106,6 +106,26 @@ CREATE TABLE public.classroom_subjects (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- TEMARIO POR MATERIA-SALÓN-PERÍODO
+CREATE TABLE public.curriculum_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  classroom_subject_id UUID REFERENCES public.classroom_subjects(id) ON DELETE CASCADE,
+  school_period_id UUID REFERENCES public.school_periods(id),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE public.curriculum_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curriculum_entry_id UUID REFERENCES public.curriculum_entries(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_size BIGINT,
+  content_type TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ASIGNACIONES PROFESOR-MATERIA-SALÓN
 CREATE TABLE public.teacher_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -339,6 +359,21 @@ CREATE POLICY "Auth read users" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Auth read classrooms" ON public.classrooms FOR SELECT USING (true);
 CREATE POLICY "Auth read subjects" ON public.subjects FOR SELECT USING (true);
 CREATE POLICY "Auth read schedules" ON public.schedules FOR SELECT USING (true);
+
+-- Curriculum entries and files
+CREATE POLICY "Admin full access curriculum" ON public.curriculum_entries FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Auth read curriculum" ON public.curriculum_entries FOR SELECT USING (
+  auth.role() = 'authenticated'
+);
+
+CREATE POLICY "Admin full access curriculum_files" ON public.curriculum_files FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Auth read curriculum_files" ON public.curriculum_files FOR SELECT USING (
+  auth.role() = 'authenticated'
+);
 
 -- ============================================================
 -- ÍNDICES DE OPTIMIZACIÓN
