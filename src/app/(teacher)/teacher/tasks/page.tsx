@@ -111,6 +111,7 @@ export default function TasksPage() {
   const [periods, setPeriods] = useState<SelectOption[]>([]);
   const [loadingModalSubjects, setLoadingModalSubjects] = useState(false);
   const [showConfigWarning, setShowConfigWarning] = useState(false);
+  const [configMaxScore, setConfigMaxScore] = useState<number | null>(null);
 
   const [attachments, setAttachments] = useState<FileEntry[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<TaskAttachment[]>([]);
@@ -337,6 +338,14 @@ export default function TasksPage() {
   useEffect(() => {
     if (teacherId) fetchTasks();
   }, [teacherId, fetchTasks]);
+
+  useEffect(() => {
+    if (!formData.classroom_subject_id || !formData.school_period_id) { setConfigMaxScore(null); return; }
+    supabaseRef.current.from("subject_grading_config")
+      .select("max_score").eq("classroom_subject_id", formData.classroom_subject_id)
+      .eq("school_period_id", formData.school_period_id).single()
+      .then(({ data }) => setConfigMaxScore((data as any)?.max_score ?? null));
+  }, [formData.classroom_subject_id, formData.school_period_id]);
 
   const resetForm = () => {
     setFormData({
@@ -725,7 +734,14 @@ export default function TasksPage() {
                 { value: "examen_final", label: "Examen Final" },
               ]}
             />
-            <Input label="Puntaje máximo" type="number" value={formData.max_score} onChange={(e) => setFormData({ ...formData, max_score: e.target.value })} min="1" />
+            {configMaxScore && (
+              <div className="flex flex-col justify-end pb-1">
+                <p className="text-xs text-slate-500">
+                  Tope configurado: <strong className="text-slate-700">0 – {configMaxScore}</strong>
+                </p>
+              </div>
+            )}
+            <Input label="Puntaje máximo" type="number" value={formData.max_score} onChange={(e) => setFormData({ ...formData, max_score: e.target.value })} min="1" max={configMaxScore || undefined} />
             <div className="flex flex-col justify-end pb-1">
               <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                 <input type="checkbox" checked={formData.allow_late} onChange={(e) => setFormData({ ...formData, allow_late: e.target.checked })} className="rounded border-slate-300" />
