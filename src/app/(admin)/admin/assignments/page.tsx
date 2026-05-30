@@ -136,12 +136,14 @@ export default function AssignmentsPage() {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from("teacher_assignments").delete().eq("id", selectedAssignment.id);
-      if (error) console.error("Error:", error);
+      if (error) throw error;
+      toast.success("Asignación eliminada");
       setDeleteDialogOpen(false);
       setSelectedAssignment(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -170,7 +172,7 @@ export default function AssignmentsPage() {
           <Select label="Período" value={formData.school_period_id} onChange={(e) => setFormData({ ...formData, school_period_id: e.target.value })} options={periods.map((p) => ({ value: p.id, label: p.name }))} />
         </form>
       </Modal>
-      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Asignación" message="¿Está seguro de eliminar esta asignación?" isLoading={isSubmitting} />
+      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Asignación" message={`¿Eliminar esta asignación?`} details={["El profesor ya no estará vinculado a esta materia/salón", "Los horarios asociados quedarán sin profesor asignado"]} type="warning" confirmLabel="Quitar" isLoading={isSubmitting} />
     </div>
   );
 }

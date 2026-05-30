@@ -243,7 +243,8 @@ export default function UsersPage() {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Eliminar Usuario"
-        message={`¿Está seguro de eliminar a ${selectedUser?.name}? Esta acción eliminará la cuenta de auth y no se puede deshacer.`}
+        message={`¿Eliminar a ${selectedUser?.name}?`}
+        details={["Su cuenta de autenticación", "Sus noticias y eventos publicados", "Si es alumno: entregas, calificaciones y boletines", "Si es profesor: asignaciones y horarios"]}
         isLoading={isSubmitting}
       />
 

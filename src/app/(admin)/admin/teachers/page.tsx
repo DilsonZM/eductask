@@ -92,14 +92,22 @@ export default function TeachersPage() {
     if (!selectedTeacher) return;
     setIsSubmitting(true);
     try {
+      const userId = selectedTeacher.user_id;
       await supabaseRef.current.from("teachers").delete().eq("id", selectedTeacher.id);
+      if (userId) {
+        await fetch("/api/admin/users", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: userId }),
+        });
+      }
       toast.success("Profesor eliminado");
       setDeleteDialogOpen(false);
       setSelectedTeacher(null);
       fetchData();
-    } catch (error) {
-      console.error("Error deleting teacher:", error);
-      toast.error("Error al eliminar");
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -134,7 +142,12 @@ export default function TeachersPage() {
           <Input label="Fecha de Contratación" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} />
         </form>
       </Modal>
-      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Profesor" message={`¿Está seguro de eliminar a ${selectedTeacher?.first_name} ${selectedTeacher?.last_name}?`} isLoading={isSubmitting} />
+      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete}
+        title="Eliminar Profesor"
+        message={`¿Eliminar a ${selectedTeacher?.first_name} ${selectedTeacher?.last_name}?`}
+        details={["Sus asignaciones de materias y salones", "Sus horarios", "Su cuenta de usuario y acceso al sistema", "Las tareas publicadas se conservarán sin profesor"]}
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

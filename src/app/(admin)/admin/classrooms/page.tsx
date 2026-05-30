@@ -107,12 +107,14 @@ export default function ClassroomsPage() {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from("classrooms").delete().eq("id", selectedClassroom.id);
-      if (error) console.error("Error:", error);
+      if (error) throw error;
+      toast.success("Salón, asignaciones, materias y horarios eliminados");
       setDeleteDialogOpen(false);
       setSelectedClassroom(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -145,7 +147,7 @@ export default function ClassroomsPage() {
           <Select label="Año Lectivo" value={formData.academic_year_id} onChange={(e) => setFormData({ ...formData, academic_year_id: e.target.value })} options={academicYears.map((y) => ({ value: y.id, label: String(y.year) }))} />
         </form>
       </Modal>
-      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Salón" message={`¿Está seguro de eliminar ${selectedClassroom?.name}?`} isLoading={isSubmitting} />
+      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Salón" message={`¿Eliminar ${selectedClassroom?.name}?`} details={["Todas las materias asignadas al salón", "Todas las tareas de esas materias", "Todas las entregas de alumnos", "Las calificaciones asociadas", "Los horarios y asignaciones de profesores", "Los boletines quedarán sin salón"]} isLoading={isSubmitting} />
     </div>
   );
 }

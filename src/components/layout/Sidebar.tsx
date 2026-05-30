@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useNavigation } from "@/components/layout/NavigationContext";
+import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
   Users,
@@ -32,6 +34,7 @@ type SidebarLink = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
+  badgeKey?: string;
 };
 
 type SidebarGroup = {
@@ -51,26 +54,26 @@ const roleConfig: Record<SidebarProps["role"], { label: string; accent: string; 
       {
         title: "Gestión",
         links: [
-          { href: "/admin/users", label: "Usuarios", icon: UserCircle },
-          { href: "/admin/students", label: "Alumnos", icon: Users },
-          { href: "/admin/teachers", label: "Profesores", icon: UserCog },
-          { href: "/admin/classrooms", label: "Salones", icon: Building2 },
-          { href: "/admin/subjects", label: "Materias", icon: BookOpen },
-          { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
+          { href: "/admin/users", label: "Usuarios", icon: UserCircle, badgeKey: "users" },
+          { href: "/admin/students", label: "Alumnos", icon: Users, badgeKey: "students" },
+          { href: "/admin/teachers", label: "Profesores", icon: UserCog, badgeKey: "teachers" },
+          { href: "/admin/classrooms", label: "Salones", icon: Building2, badgeKey: "classrooms" },
+          { href: "/admin/subjects", label: "Materias", icon: BookOpen, badgeKey: "subjects" },
+          { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList, badgeKey: "assignments" },
         ],
       },
       {
         title: "Planificación",
         links: [
-          { href: "/admin/periods", label: "Períodos", icon: CalendarDays },
+          { href: "/admin/periods", label: "Períodos", icon: CalendarDays, badgeKey: "periods" },
           { href: "/admin/schedules", label: "Horarios", icon: Clock },
         ],
       },
       {
         title: "Comunicación",
         links: [
-          { href: "/admin/news", label: "Noticias", icon: Newspaper },
-          { href: "/admin/events", label: "Eventos", icon: Calendar },
+          { href: "/admin/news", label: "Noticias", icon: Newspaper, badgeKey: "news" },
+          { href: "/admin/events", label: "Eventos", icon: Calendar, badgeKey: "events" },
         ],
       },
     ],
@@ -86,7 +89,7 @@ const roleConfig: Record<SidebarProps["role"], { label: string; accent: string; 
       {
         title: "Docencia",
         links: [
-          { href: "/teacher/tasks", label: "Tareas", icon: CheckSquare },
+          { href: "/teacher/tasks", label: "Tareas", icon: CheckSquare, badgeKey: "tasks" },
           { href: "/teacher/subjects", label: "Materias", icon: BookOpen },
           { href: "/teacher/schedule", label: "Horario", icon: Clock },
           { href: "/teacher/students", label: "Mis Estudiantes", icon: Users },
@@ -96,8 +99,8 @@ const roleConfig: Record<SidebarProps["role"], { label: string; accent: string; 
         title: "Evaluación",
         links: [
           { href: "/teacher/grading-config", label: "Configurar Evaluación", icon: Sliders },
-          { href: "/teacher/submissions", label: "Entregas", icon: FileText },
-          { href: "/teacher/grades", label: "Notas", icon: GraduationCap },
+          { href: "/teacher/submissions", label: "Entregas", icon: FileText, badgeKey: "submissions" },
+          { href: "/teacher/grades", label: "Notas", icon: GraduationCap, badgeKey: "grades" },
         ],
       },
     ],
@@ -115,7 +118,7 @@ const roleConfig: Record<SidebarProps["role"], { label: string; accent: string; 
         links: [
           { href: "/student/subjects", label: "Materias", icon: BookOpen },
           { href: "/student/schedule", label: "Horario", icon: Clock },
-          { href: "/student/tasks", label: "Tareas", icon: CheckSquare },
+          { href: "/student/tasks", label: "Tareas", icon: CheckSquare, badgeKey: "pending_tasks" },
         ],
       },
       {
@@ -133,6 +136,62 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { navigateTo } = useNavigation();
   const config = roleConfig[role];
+  const supabase = createClient();
+  const [badges, setBadges] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    async function fetchBadges() {
+      try {
+        const counts: Record<string, number> = {};
+
+        if (role === "admin") {
+          const tables = ["users", "students", "teachers", "classrooms", "subjects",
+            "teacher_assignments", "school_periods", "news", "events"];
+          await Promise.all(
+            tables.map(async (t) => {
+              const key = t === "teacher_assignments" ? "assignments" : t === "school_periods" ? "periods" : t;
+              const { count, error } = await supabase.from(t).select("*", { count: "exact", head: true });
+              if (!error && count != null) counts[key] = count;
+            })
+          );
+        } else if (role === "teacher") {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const { data: teacher } = await supabase.from("teachers").select("id").eq("user_id", user.id).single();
+          if (!teacher) return;
+
+          const { count: tasksCount } = await supabase.from("tasks").select("*", { count: "exact", head: true }).eq("teacher_id", teacher.id).eq("status", "published");
+          if (tasksCount != null) counts["tasks"] = tasksCount;
+
+          const { count: submissionsCount } = await supabase.from("submissions").select("*", { count: "exact", head: true }).is("score", null);
+          if (submissionsCount != null) counts["submissions"] = submissionsCount;
+
+          const { count: gradesCount } = await supabase.from("grades").select("*", { count: "exact", head: true }).eq("teacher_id", teacher.id);
+          if (gradesCount != null) counts["grades"] = gradesCount;
+        } else if (role === "student") {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const { data: student } = await supabase.from("students").select("id, classroom_id").eq("user_id", user.id).single();
+          if (!student?.classroom_id) return;
+
+          const { data: cmSubjects } = await supabase.from("classroom_subjects").select("id").eq("classroom_id", student.classroom_id);
+          if (cmSubjects?.length) {
+            const csIds = cmSubjects.map((cs: { id: string }) => cs.id);
+            const { count: pendingTasks } = await supabase.from("tasks")
+              .select("*", { count: "exact", head: true })
+              .in("classroom_subject_id", csIds)
+              .eq("status", "published");
+            if (pendingTasks != null) counts["pending_tasks"] = pendingTasks;
+          }
+        }
+
+        setBadges(counts);
+      } catch {
+        // silent
+      }
+    }
+    fetchBadges();
+  }, [role, supabase]);
 
   return (
     <>
@@ -191,6 +250,7 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
                 {group.links.map((link) => {
                   const Icon = link.icon;
                   const isActive = pathname === link.href;
+                  const badgeCount = link.badgeKey ? badges[link.badgeKey] : undefined;
                   return (
                     <button
                       key={link.href}
@@ -217,12 +277,23 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
                         <Icon className="w-4 h-4" />
                       </span>
                       <span className="flex-1">{link.label}</span>
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full transition-opacity duration-200",
-                          isActive ? "bg-primary-500" : "bg-transparent group-hover:bg-gray-300"
-                        )}
-                      />
+                      {badgeCount != null && badgeCount > 0 ? (
+                        <span className={cn(
+                          "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold rounded-full",
+                          isActive
+                            ? "bg-primary-600 text-white"
+                            : "bg-red-500 text-white"
+                        )}>
+                          {badgeCount}
+                        </span>
+                      ) : (
+                        <span
+                          className={cn(
+                            "h-2 w-2 rounded-full transition-opacity duration-200",
+                            isActive ? "bg-primary-500" : "bg-transparent group-hover:bg-gray-300"
+                          )}
+                        />
+                      )}
                     </button>
                   );
                 })}

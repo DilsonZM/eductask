@@ -135,12 +135,15 @@ export async function DELETE(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceRoleKey
     );
-    const { error } = await admin.auth.admin.deleteUser(id);
 
-    if (error) throw error;
+    const { error: dbError } = await admin.from("users").delete().eq("id", id);
+    if (dbError) throw dbError;
+
+    const { error: authError } = await admin.auth.admin.deleteUser(id);
+    if (authError && !authError.message?.includes("not found")) throw authError;
 
     return NextResponse.json({ message: "Usuario eliminado" });
-  } catch (error) {
-    return NextResponse.json({ error }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || "Error" }, { status: 500 });
   }
 }

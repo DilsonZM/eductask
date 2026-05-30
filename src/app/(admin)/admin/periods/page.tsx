@@ -142,15 +142,14 @@ export default function PeriodsPage() {
     if (!selectedPeriod) return;
     setIsSubmitting(true);
     try {
-      await supabaseRef.current
-        .from("school_periods")
-        .delete()
-        .eq("id", selectedPeriod.id);
+      await supabaseRef.current.from("school_periods").delete().eq("id", selectedPeriod.id);
+      toast.success("Período eliminado");
       setDeleteDialogOpen(false);
       setSelectedPeriod(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -277,7 +276,8 @@ export default function PeriodsPage() {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Eliminar Período"
-        message={`¿Está seguro de eliminar "${selectedPeriod?.name}"?`}
+        message={`¿Eliminar "${selectedPeriod?.name}"?`}
+        details={["Todas las tareas de este período", "Las calificaciones y boletines", "Las asignaciones de profesores", "El contenido curricular asociado"]}
         isLoading={isSubmitting}
       />
     </div>

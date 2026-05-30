@@ -87,11 +87,13 @@ export default function NewsPage() {
     setIsSubmitting(true);
     try {
       await supabaseRef.current.from("news").delete().eq("id", selectedNews.id);
+      toast.success("Noticia eliminada");
       setDeleteDialogOpen(false);
       setSelectedNews(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +138,7 @@ export default function NewsPage() {
           </div>
         </form>
       </Modal>
-      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Noticia" message={`¿Está seguro de eliminar "${selectedNews?.title}"?`} isLoading={isSubmitting} />
+      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Noticia" message={`¿Eliminar "${selectedNews?.title}"?`} type="danger" isLoading={isSubmitting} />
     </div>
   );
 }

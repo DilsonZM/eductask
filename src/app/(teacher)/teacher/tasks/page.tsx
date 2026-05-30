@@ -805,7 +805,7 @@ export default function TasksPage() {
         <p className="text-sm text-slate-600">Antes de publicar actividades debes configurar los pesos de evaluación para esta materia y período.</p>
       </Modal>
 
-      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Tarea" message={`¿Seguro de eliminar "${selectedTask?.title}"?`} isLoading={isSubmitting} />
+      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Tarea" message={`¿Eliminar "${selectedTask?.title}"?`} details={["Todas las entregas de alumnos asociadas", "Los archivos adjuntos de la tarea"]} isLoading={isSubmitting} />
     </div>
   );
 }

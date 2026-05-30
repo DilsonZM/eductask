@@ -80,11 +80,13 @@ export default function EventsPage() {
     setIsSubmitting(true);
     try {
       await supabaseRef.current.from("events").delete().eq("id", selectedEvent.id);
+      toast.success("Evento eliminado");
       setDeleteDialogOpen(false);
       setSelectedEvent(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -127,7 +129,7 @@ export default function EventsPage() {
           </label>
         </form>
       </Modal>
-      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Evento" message={`¿Está seguro de eliminar "${selectedEvent?.title}"?`} isLoading={isSubmitting} />
+      <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Evento" message={`¿Eliminar "${selectedEvent?.title}"?`} type="danger" isLoading={isSubmitting} />
     </div>
   );
 }

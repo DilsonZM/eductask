@@ -121,12 +121,22 @@ export default function StudentsPage() {
     if (!selectedStudent) return;
     setIsSubmitting(true);
     try {
-      await supabaseRef.current.from("students").delete().eq("id", selectedStudent.id);
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedStudent.user_id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as any)?.error || "Error");
+      }
+      toast.success("Alumno eliminado");
       setDeleteDialogOpen(false);
       setSelectedStudent(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting student:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -274,7 +284,8 @@ export default function StudentsPage() {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Eliminar Alumno"
-        message={`¿Está seguro de eliminar a ${selectedStudent?.first_name} ${selectedStudent?.last_name}? Esta acción no se puede deshacer.`}
+        message={`¿Eliminar a ${selectedStudent?.first_name} ${selectedStudent?.last_name}?`}
+        details={["Todas sus entregas de tareas", "Sus calificaciones y boletines", "Sus exoneraciones", "Su cuenta de usuario y acceso al sistema"]}
         isLoading={isSubmitting}
       />
     </div>

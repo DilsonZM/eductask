@@ -406,15 +406,14 @@ export default function SubjectsPage() {
     if (!selectedSubject) return;
     setIsSubmitting(true);
     try {
-      await supabaseRef.current
-        .from("subjects")
-        .delete()
-        .eq("id", selectedSubject.id);
+      await supabaseRef.current.from("subjects").delete().eq("id", selectedSubject.id);
+      toast.success("Materia eliminada");
       setDeleteDialogOpen(false);
       setSelectedSubject(null);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      toast.error(error?.message || "Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }
@@ -603,7 +602,8 @@ export default function SubjectsPage() {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Eliminar Materia"
-        message={`¿Está seguro de eliminar ${selectedSubject?.name}?`}
+        message={`¿Eliminar ${selectedSubject?.name}?`}
+        details={["Todas las asignaciones a salones", "Las tareas asociadas", "Las entregas y calificaciones", "Los horarios de esta materia"]}
         isLoading={isSubmitting}
       />
     </div>
