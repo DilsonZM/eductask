@@ -21,6 +21,7 @@ type TaskOption = {
   max_score: number;
   classroom_subject_id: string;
   classroom_id: string;
+  school_period_id: string;
 };
 
 interface SubmissionRow {
@@ -41,6 +42,7 @@ export default function SubmissionsPage() {
 
   const [tasks, setTasks] = useState<TaskOption[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [teacherId, setTeacherId] = useState<string | null>(null);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
@@ -65,6 +67,8 @@ export default function SubmissionsPage() {
         return;
       }
 
+      setTeacherId(teacher.id);
+
       const { data: tasksData } = await supabaseRef.current
         .from("tasks")
         .select("*, classroom_subjects!inner(id, classroom_id, subjects!inner(name))")
@@ -84,6 +88,7 @@ export default function SubmissionsPage() {
               max_score: (t.max_score as number) || 10,
               classroom_subject_id: t.classroom_subject_id as string,
               classroom_id: (cs?.classroom_id as string) || "",
+              school_period_id: t.school_period_id as string,
             };
           });
         setTasks(mapped);
@@ -227,6 +232,32 @@ export default function SubmissionsPage() {
             : s
         )
       );
+
+      const submission = submissions.find((s) => s.id === submissionId);
+      const task = selectedTaskData;
+      if (submission && task && teacherId) {
+        const { data: existing } = await supabaseRef.current
+          .from("grades")
+          .select("id")
+          .eq("student_id", submission.student_id)
+          .eq("classroom_subject_id", task.classroom_subject_id)
+          .eq("school_period_id", task.school_period_id)
+          .single();
+
+        if (existing) {
+          await supabaseRef.current.from("grades").update({
+            score, graded_at: new Date().toISOString(),
+          }).eq("id", existing.id);
+        } else {
+          await supabaseRef.current.from("grades").insert({
+            student_id: submission.student_id,
+            teacher_id: teacherId,
+            classroom_subject_id: task.classroom_subject_id,
+            school_period_id: task.school_period_id,
+            score, graded_at: new Date().toISOString(),
+          });
+        }
+      }
 
       toast.success("Calificación guardada");
     } catch (error) {
