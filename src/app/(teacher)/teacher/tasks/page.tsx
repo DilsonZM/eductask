@@ -14,6 +14,7 @@ import { formatDateTime } from "@/lib/utils";
 import type { Tables } from "@/types/database";
 import toast from "react-hot-toast";
 import { X, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 type Task = Tables<"tasks">;
 type TaskAttachment = Tables<"task_attachments">;
@@ -109,6 +110,7 @@ export default function TasksPage() {
   const [modalSubjects, setModalSubjects] = useState<SelectOption[]>([]);
   const [periods, setPeriods] = useState<SelectOption[]>([]);
   const [loadingModalSubjects, setLoadingModalSubjects] = useState(false);
+  const [showConfigWarning, setShowConfigWarning] = useState(false);
 
   const [attachments, setAttachments] = useState<FileEntry[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<TaskAttachment[]>([]);
@@ -475,7 +477,8 @@ export default function TasksPage() {
         .select("id").eq("classroom_subject_id", formData.classroom_subject_id)
         .eq("school_period_id", formData.school_period_id).single();
       if (!config) {
-        toast.error("Debes configurar la evaluación antes de publicar. Ve a Configurar Evaluación.");
+        setShowConfigWarning(true);
+        setIsSubmitting(false);
         return;
       }
     }
@@ -494,6 +497,7 @@ export default function TasksPage() {
         status,
       };
       if (formData.school_period_id) payload.school_period_id = formData.school_period_id;
+      if (formData.category) payload.category = formData.category;
       if (formData.category) payload.category = formData.category;
 
       if (selectedTask) {
@@ -708,6 +712,19 @@ export default function TasksPage() {
                 { value: "examen_final", label: "Examen Final" },
               ]}
             />
+            <Select
+              label="Categoría"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              options={[
+                { value: "", label: "Seleccionar..." },
+                { value: "taller", label: "Taller" },
+                { value: "trabajo", label: "Trabajo" },
+                { value: "quiz", label: "Quiz" },
+                { value: "participacion", label: "Participación" },
+                { value: "examen_final", label: "Examen Final" },
+              ]}
+            />
             <Input label="Puntaje máximo" type="number" value={formData.max_score} onChange={(e) => setFormData({ ...formData, max_score: e.target.value })} min="1" />
             <div className="flex flex-col justify-end pb-1">
               <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
@@ -754,6 +771,11 @@ export default function TasksPage() {
             )}
           </div>
         </div>
+      </Modal>
+
+      <Modal isOpen={showConfigWarning} onClose={() => setShowConfigWarning(false)} title="Configuración requerida" size="sm"
+        footer={<><Button variant="outline" onClick={() => setShowConfigWarning(false)}>Cancelar</Button><Link href="/teacher/grading-config"><Button>Ir a configurar evaluación</Button></Link></>}>
+        <p className="text-sm text-slate-600">Antes de publicar actividades debes configurar los pesos de evaluación para esta materia y período.</p>
       </Modal>
 
       <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Tarea" message={`¿Seguro de eliminar "${selectedTask?.title}"?`} isLoading={isSubmitting} />
