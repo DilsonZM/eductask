@@ -6,15 +6,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ShimmerTable } from "@/components/common/SkeletonLoader";
 import { cn } from "@/lib/utils";
-import { BookOpen, Star, CheckCircle, Circle } from "lucide-react";
+import { BookOpen, Star, CheckCircle, Circle, ThumbsUp, ThumbsDown } from "lucide-react";
 
 const CAT_ORDER = ["taller", "trabajo", "quiz", "participacion", "examen_final"];
+const WEIGHT_CATS = ["taller", "trabajo", "quiz", "examen_final"] as const;
 const CAT_LABELS: Record<string, string> = {
   taller: "Taller", trabajo: "Trabajo", quiz: "Quiz", participacion: "Participación", examen_final: "Examen Final",
 };
 
-interface GradingConfig { weights: Record<string, number>; maxScore: number; }
-interface CatData { avg: number | null; exempt: boolean; exemptScore: number | null; }
+interface GradingConfig { weights: Record<string, number>; maxScore: number; bonusPartic: number; }
+interface CatData { avg: number | null; exempt: boolean; exemptScore: number | null; bonus: number | null; }
 
 export default function GradesPage() {
   const { user, loading: authLoading } = useAuth();
@@ -58,9 +59,10 @@ export default function GradesPage() {
         cfgMap[c.classroom_subject_id] = {
           weights: {
             taller: c.weight_taller || 0, trabajo: c.weight_trabajo || 0, quiz: c.weight_quiz || 0,
-            participacion: c.weight_participacion || 0, examen_final: c.weight_examen_final || 0,
+            examen_final: c.weight_examen_final || 0,
           },
           maxScore: c.max_score || 10,
+          bonusPartic: c.weight_participacion || 0,
         };
       });
       setConfigs(cfgMap);
@@ -89,14 +91,18 @@ export default function GradesPage() {
     const cats: Record<string, CatData> = {};
     CAT_ORDER.forEach((cat) => {
       const ex = exs.find((e: any) => e.category === cat);
-      const avg = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
-      cats[cat] = { avg: ex ? null : avg, exempt: !!ex, exemptScore: ex?.auto_score || null };
+      if (cat === "participacion") {
+        cats[cat] = { avg: null, exempt: !!ex, exemptScore: ex?.auto_score || null, bonus: ex ? ex.auto_score : 0 };
+      } else {
+        const avg = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+        cats[cat] = { avg: ex ? null : avg, exempt: !!ex, exemptScore: ex?.auto_score || null, bonus: null };
+      }
     });
 
     setCategories(cats);
 
     let wSum = 0, wCount = 0;
-    CAT_ORDER.forEach((cat) => {
+    WEIGHT_CATS.forEach((cat) => {
       const w = cfg.weights[cat] || 0;
       if (!w) return;
       const d = cats[cat];
@@ -105,7 +111,13 @@ export default function GradesPage() {
       else if (d.avg !== null) val = d.avg;
       if (val !== null) { wSum += (val / cfg.maxScore) * w; wCount += w; }
     });
-    setWeightedAvg(wCount > 0 ? Math.round((wSum / wCount) * cfg.maxScore * 10) / 10 : null);
+    let avg = wCount > 0 ? Math.round((wSum / wCount) * cfg.maxScore * 10) / 10 : null;
+
+    const bonusCat = cats["participacion"];
+    const bonus = bonusCat?.exempt ? (bonusCat.exemptScore || 0) : (bonusCat?.bonus || 0);
+    if (avg !== null && bonus > 0) avg = Math.min(Math.round((avg + bonus) * 10) / 10, cfg.maxScore);
+
+    setWeightedAvg(avg);
   }, []);
 
   const handleSubject = (csId: string) => {
@@ -156,16 +168,24 @@ export default function GradesPage() {
                     {CAT_ORDER.map((cat) => {
                       const d = categories[cat];
                       if (!d) return null;
-                      const w = cfg.weights[cat] || 0;
+                      const isParticipacion = cat === "participacion";
+                      const w = isParticipacion ? 0 : (cfg.weights[cat] || 0);
                       return (
                         <tr key={cat}>
-                          <td className="px-4 py-3 text-sm font-medium text-slate-800">{CAT_LABELS[cat]}</td>
-                          <td className="px-4 py-3 text-center text-sm text-slate-500">{w}%</td>
+                          <td className="px-4 py-3 text-sm font-medium text-slate-800">
+                            {CAT_LABELS[cat]}
+                            {isParticipacion && <span className="text-xs text-amber-500 ml-1">⭐ bonus</span>}
+                          </td>
+                          <td className="px-4 py-3 text-center text-sm text-slate-500">
+                            {isParticipacion ? "—" : `${w}%`}
+                          </td>
                           <td className="px-4 py-3 text-center">
                             {d.exempt ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-bold bg-purple-50 text-purple-700 border border-purple-200">
                                 <Star className="w-3.5 h-3.5" /> {d.exemptScore} / {cfg.maxScore}
                               </span>
+                            ) : isParticipacion ? (
+                              <span className="text-sm text-slate-400">+{cfg.bonusPartic} pts</span>
                             ) : d.avg !== null ? (
                               <span className={cn("inline-block rounded-lg px-2.5 py-1 text-sm font-semibold border",
                                 d.avg >= 7 || cfg.maxScore > 10 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
@@ -179,6 +199,8 @@ export default function GradesPage() {
                           <td className="px-4 py-3 text-center">
                             {d.exempt ? (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600"><Star className="w-3 h-3" /> Exonerado</span>
+                            ) : isParticipacion ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-600">⚡ Comodín</span>
                             ) : d.avg !== null ? (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle className="w-3 h-3" /> Calificado</span>
                             ) : (
@@ -205,6 +227,24 @@ export default function GradesPage() {
                               style={{ width: `${Math.min((weightedAvg / cfg.maxScore) * 100, 100)}%` }} />
                           </div>
                           <span className="text-xs text-slate-400">{Math.round((weightedAvg / cfg.maxScore) * 100)}%</span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                  {weightedAvg !== null && (
+                    <tfoot>
+                      <tr className="border-t border-slate-100 bg-white">
+                        <td colSpan={4} className="px-4 py-3 text-center">
+                          <span className={cn("inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold",
+                            (weightedAvg / cfg.maxScore) >= 0.6
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-red-100 text-red-700")}>
+                            {(weightedAvg / cfg.maxScore) >= 0.6 ? (
+                              <><ThumbsUp className="w-4 h-4" /> Aprobado (mín 60%)</>
+                            ) : (
+                              <><ThumbsDown className="w-4 h-4" /> Reprobado — necesitas {Math.round(cfg.maxScore * 0.6)} / {cfg.maxScore} (60%)</>
+                            )}
+                          </span>
                         </td>
                       </tr>
                     </tfoot>

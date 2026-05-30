@@ -15,16 +15,15 @@ interface GradingConfig {
   weight_taller: number;
   weight_trabajo: number;
   weight_quiz: number;
-  weight_participacion: number;
   weight_examen_final: number;
+  bonus_participacion: number;
   max_score: number;
 }
 
-const CATEGORIES = [
+const WEIGHT_CATS = [
   { key: "taller", label: "Taller" },
   { key: "trabajo", label: "Trabajo" },
   { key: "quiz", label: "Quiz" },
-  { key: "participacion", label: "Participación" },
   { key: "examen_final", label: "Examen Final" },
 ] as const;
 
@@ -42,7 +41,7 @@ export default function GradingConfigPage() {
   const [periodId, setPeriodId] = useState("");
   const [config, setConfig] = useState<GradingConfig>({
     weight_taller: 0, weight_trabajo: 0, weight_quiz: 0,
-    weight_participacion: 0, weight_examen_final: 0, max_score: 10,
+    weight_examen_final: 0, bonus_participacion: 0, max_score: 10,
   });
   const [existingConfigId, setExistingConfigId] = useState<string | null>(null);
 
@@ -101,14 +100,14 @@ export default function GradingConfigPage() {
         weight_taller: (d.weight_taller as number) || 0,
         weight_trabajo: (d.weight_trabajo as number) || 0,
         weight_quiz: (d.weight_quiz as number) || 0,
-        weight_participacion: (d.weight_participacion as number) || 0,
         weight_examen_final: (d.weight_examen_final as number) || 0,
+        bonus_participacion: (d.weight_participacion as number) || 0,
         max_score: (d.max_score as number) || 10,
       });
       setExistingConfigId(d.id as string);
-      setHasGrades(true); // if config exists, assume grades might exist
+      setHasGrades(true);
     } else {
-      setConfig({ weight_taller: 0, weight_trabajo: 0, weight_quiz: 0, weight_participacion: 0, weight_examen_final: 0, max_score: 10 });
+      setConfig({ weight_taller: 0, weight_trabajo: 0, weight_quiz: 0, weight_examen_final: 0, bonus_participacion: 0, max_score: 10 });
       setExistingConfigId(null);
       setHasGrades(false);
     }
@@ -154,7 +153,7 @@ export default function GradingConfigPage() {
   }, [classroomId, subjectId, periodId]);
 
   const totalWeight = useMemo(() =>
-    config.weight_taller + config.weight_trabajo + config.weight_quiz + config.weight_participacion + config.weight_examen_final,
+    config.weight_taller + config.weight_trabajo + config.weight_quiz + config.weight_examen_final,
     [config]);
   const isValid = totalWeight === 100;
 
@@ -178,7 +177,7 @@ export default function GradingConfigPage() {
         weight_taller: config.weight_taller,
         weight_trabajo: config.weight_trabajo,
         weight_quiz: config.weight_quiz,
-        weight_participacion: config.weight_participacion,
+        weight_participacion: config.bonus_participacion,
         weight_examen_final: config.weight_examen_final,
         max_score: config.max_score,
       };
@@ -274,7 +273,7 @@ export default function GradingConfigPage() {
                     style={{ width: `${Math.min(totalWeight, 100)}%` }} />
                 </div>
                 <div className="space-y-3">
-                  {CATEGORIES.map((cat) => {
+                  {WEIGHT_CATS.map((cat) => {
                     const key = `weight_${cat.key}` as keyof GradingConfig;
                     return (
                       <div key={cat.key} className="flex items-center gap-3">
@@ -286,6 +285,18 @@ export default function GradingConfigPage() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <p className="text-sm font-medium text-amber-800 mb-2">⭐ Participación (bonus manual)</p>
+                <p className="text-xs text-amber-600 mb-3">Este valor se suma 1:1 al promedio final. Úsalo como comodín para ayudar a estudiantes que están cerca del 60%.</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-700">Bonus máx:</span>
+                  <input type="number" min={0} max={config.max_score} value={config.bonus_participacion || ""}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, bonus_participacion: parseFloat(e.target.value) || 0 }))}
+                    className="w-20 px-3 py-1.5 border border-amber-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-500 outline-none" />
+                  <span className="text-sm text-amber-600">/ {config.max_score} pts</span>
                 </div>
               </div>
 

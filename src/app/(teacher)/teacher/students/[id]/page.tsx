@@ -20,6 +20,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   taller: "Taller", trabajo: "Trabajo", quiz: "Quiz", participacion: "Participación", examen_final: "Examen Final",
 };
 const CAT_ORDER = ["taller", "trabajo", "quiz", "participacion", "examen_final"];
+const WEIGHT_CATS = ["taller", "trabajo", "quiz", "examen_final"] as const;
 
 export default function StudentProfilePage({ params }: { params: { id: string } }) {
   const { user } = useAuth();
@@ -32,7 +33,7 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
   const classroomName = sp.get("classroomName") || "";
 
   const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState<{ weights: Record<string, number>; maxScore: number } | null>(null);
+  const [config, setConfig] = useState<{ weights: Record<string, number>; maxScore: number; bonusPartic: number } | null>(null);
   const [categories, setCategories] = useState<Record<string, CategoryData>>({});
   const [exemptions, setExemptions] = useState<ExemptionRow[]>([]);
   const [weightedAvg, setWeightedAvg] = useState<number | null>(null);
@@ -58,11 +59,11 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
         taller: (configData as any)?.weight_taller || 0,
         trabajo: (configData as any)?.weight_trabajo || 0,
         quiz: (configData as any)?.weight_quiz || 0,
-        participacion: (configData as any)?.weight_participacion || 0,
         examen_final: (configData as any)?.weight_examen_final || 0,
       };
+      const bonusPartic = (configData as any)?.weight_participacion || 0;
       const maxScore = (configData as any)?.max_score || 10;
-      setConfig({ weights, maxScore });
+      setConfig({ weights, maxScore, bonusPartic });
 
       const { data: tasks } = await supabaseRef.current.from("tasks")
         .select("id, title, category, due_date").eq("classroom_subject_id", csId).in("status", ["published", "closed"]);
@@ -107,7 +108,7 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
       setSubsHistory(history);
 
       let wSum = 0, wCount = 0;
-      CAT_ORDER.forEach((cat) => {
+      WEIGHT_CATS.forEach((cat) => {
         const w = weights[cat];
         if (!w) return;
         const d = cats[cat];
@@ -115,7 +116,13 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
         if (ex) { wSum += (ex.auto_score / maxScore) * w; wCount += w; }
         else if (d.avg !== null) { wSum += (d.avg / maxScore) * w; wCount += w; }
       });
-      setWeightedAvg(wCount > 0 ? Math.round((wSum / wCount) * maxScore * 10) / 10 : null);
+      let avg = wCount > 0 ? Math.round((wSum / wCount) * maxScore * 10) / 10 : null;
+      if (avg !== null && bonusPartic > 0) {
+        const particCat = cats["participacion"];
+        const bonus = particCat?.exemption ? (particCat.exemption.auto_score || 0) : (bonusPartic || 0);
+        avg = Math.min(Math.round((avg + bonus) * 10) / 10, maxScore);
+      }
+      setWeightedAvg(avg);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, [csId, studentId]);
