@@ -140,16 +140,16 @@ export default function GradingConfigPage() {
         <div className="overflow-x-auto">
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[10%]" />
               <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[7%]" />
               <col className="w-[8%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[10%]" />
-              <col className="w-[9%]" />
               <col className="w-[8%]" />
-              <col className="w-[16%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
+              <col className="w-[19%]" />
             </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/50">
@@ -175,7 +175,7 @@ export default function GradingConfigPage() {
                     <td className="px-2 py-3 text-sm text-slate-700 truncate">{row.subjectName}</td>
                     <td className="px-1 py-3 text-center">
                       <select value={row.max_score} onChange={(e) => updateRow(row.classroomSubjId, "max_score", parseInt(e.target.value))}
-                        className="w-full px-1 py-1.5 border border-slate-200 rounded-lg text-xs text-center font-medium text-slate-700 bg-white focus:ring-2 focus:ring-primary-500 outline-none">
+                        className="w-12 mx-auto px-0 py-1.5 border border-slate-200 rounded-lg text-xs text-center font-medium text-slate-700 bg-white focus:ring-2 focus:ring-primary-500 outline-none">
                         {MAX_SCORE_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
                       </select>
                     </td>
@@ -183,13 +183,13 @@ export default function GradingConfigPage() {
                       <td key={k} className="px-1 py-3 text-center">
                         <input type="number" min={0} max={100} value={row[k] || ""}
                           onChange={(e) => updateRow(row.classroomSubjId, k, parseFloat(e.target.value) || 0)}
-                          className="w-full px-1 py-1.5 border border-slate-200 rounded-lg text-xs text-center font-medium text-slate-700 focus:ring-2 focus:ring-primary-500 outline-none" />
+                          className="w-12 mx-auto px-0 py-1.5 border border-slate-200 rounded-lg text-xs text-center font-medium text-slate-700 focus:ring-2 focus:ring-primary-500 outline-none" />
                       </td>
                     ))}
                     <td className="px-1 py-3 text-center">
                       <input type="number" min={0} max={row.max_score} value={row.bonus || ""}
                         onChange={(e) => updateRow(row.classroomSubjId, "bonus", parseFloat(e.target.value) || 0)}
-                        className="w-full px-1 py-1.5 border border-amber-200 bg-amber-50 rounded-lg text-xs text-center font-medium text-amber-700 focus:ring-2 focus:ring-amber-500 outline-none" />
+                        className="w-12 mx-auto px-0 py-1.5 border border-amber-200 bg-amber-50 rounded-lg text-xs text-center font-medium text-amber-700 focus:ring-2 focus:ring-amber-500 outline-none" />
                     </td>
                     <td className="px-1 py-3 text-center">
                       <span className={cn("text-xs font-bold", isValid ? "text-emerald-600" : tw > 100 ? "text-red-500" : "text-amber-500")}>
