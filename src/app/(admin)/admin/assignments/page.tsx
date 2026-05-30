@@ -124,6 +124,10 @@ export default function AssignmentsPage() {
       } else {
         const { error } = await supabase.from("teacher_assignments").insert([formData]);
         if (error) throw error;
+        const { data: existingCs } = await supabase.from("classroom_subjects").select("id").eq("classroom_id", formData.classroom_id).eq("subject_id", formData.subject_id).maybeSingle();
+        if (!existingCs) {
+          await supabase.from("classroom_subjects").insert({ classroom_id: formData.classroom_id, subject_id: formData.subject_id });
+        }
       }
       toast.success(selectedAssignment ? "Asignación actualizada" : "Asignación creada");
       const { data: teacher } = await supabase.from("teachers").select("user_id, first_name").eq("id", formData.teacher_id).single();
