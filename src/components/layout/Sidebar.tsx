@@ -19,6 +19,7 @@ import {
   Clock,
   CheckSquare,
   UserCircle,
+  Sliders,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -88,11 +89,13 @@ const roleConfig: Record<SidebarProps["role"], { label: string; accent: string; 
           { href: "/teacher/tasks", label: "Tareas", icon: CheckSquare },
           { href: "/teacher/subjects", label: "Materias", icon: BookOpen },
           { href: "/teacher/schedule", label: "Horario", icon: Clock },
+          { href: "/teacher/students", label: "Mis Estudiantes", icon: Users },
         ],
       },
       {
         title: "Evaluación",
         links: [
+          { href: "/teacher/grading-config", label: "Configurar Evaluación", icon: Sliders },
           { href: "/teacher/submissions", label: "Entregas", icon: FileText },
           { href: "/teacher/grades", label: "Notas", icon: GraduationCap },
         ],
