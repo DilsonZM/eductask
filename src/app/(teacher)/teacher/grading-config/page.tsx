@@ -80,7 +80,7 @@ export default function GradingConfigPage() {
 
       const { data: configs } = await supabaseRef.current.from("subject_grading_config")
         .select("id, classroom_subject_id, weight_taller, weight_trabajo, weight_quiz, weight_examen_final, weight_participacion, max_score, classroom_subjects!inner(classroom_id, subject_id, classrooms!inner(name), subjects!inner(name))")
-        .eq("teacher_id", teacher.id);
+        .eq("teacher_id", user.id);
 
       if (configs) {
         const mapped: SavedConfig[] = configs.map((r: any) => ({
@@ -180,7 +180,7 @@ export default function GradingConfigPage() {
 
   const handleSave = async () => {
     if (!isValid) { toast.error("Los pesos deben sumar 100%"); return; }
-    if (!teacherId || !classroomId || !subjectId) { toast.error("Seleccione salón y materia"); return; }
+    if (!user || !classroomId || !subjectId) { toast.error("Seleccione salón y materia"); return; }
     setSaving(true);
     try {
       const { data: cs } = await supabaseRef.current.from("classroom_subjects").select("id")
@@ -189,7 +189,7 @@ export default function GradingConfigPage() {
 
       const payload = {
         classroom_subject_id: cs.id,
-        teacher_id: teacherId,
+        teacher_id: user.id,
         weight_taller: formConfig.weight_taller,
         weight_trabajo: formConfig.weight_trabajo,
         weight_quiz: formConfig.weight_quiz,
