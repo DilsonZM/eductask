@@ -37,9 +37,12 @@ export default function GradingConfigPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
+      const { data: teacher } = await supabaseRef.current.from("teachers").select("id").eq("user_id", user.id).single();
+      if (!teacher) { setRows([]); setLoading(false); return; }
+
       const { data: ta } = await supabaseRef.current.from("teacher_assignments")
         .select("classroom_id, subject_id, classrooms!inner(id, name, grade_level), subjects!inner(id, name)")
-        .eq("teacher_id", user.id);
+        .eq("teacher_id", teacher.id);
 
       const { data: configs } = await supabaseRef.current.from("subject_grading_config")
         .select("*").eq("teacher_id", user.id);
