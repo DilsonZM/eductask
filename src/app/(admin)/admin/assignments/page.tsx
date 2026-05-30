@@ -111,21 +111,25 @@ export default function AssignmentsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.teacher_id || !formData.classroom_id || !formData.subject_id || !formData.school_period_id) {
+      toast.error("Todos los campos son obligatorios");
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (selectedAssignment) {
         const { error } = await supabase.from("teacher_assignments").update(formData).eq("id", selectedAssignment.id);
-        if (error) console.error("Error:", error);
+        if (error) throw error;
       } else {
         const { error } = await supabase.from("teacher_assignments").insert([formData]);
-        if (error) console.error("Error:", error);
+        if (error) throw error;
       }
       toast.success(selectedAssignment ? "Asignación actualizada" : "Asignación creada");
       setModalOpen(false);
-      fetchData();
-    } catch (error) {
+      await fetchData();
+    } catch (error: any) {
       console.error("Error:", error);
-      toast.error("Error al guardar");
+      toast.error(error?.message || "Error al guardar");
     } finally {
       setIsSubmitting(false);
     }
@@ -164,12 +168,12 @@ export default function AssignmentsPage() {
       ) : (
         <DataTable isLoading={loading} data={assignments} columns={columns} searchPlaceholder="Buscar por profesor o materia..." searchKeys={["teacher_name", "subject_name", "classroom_name"]} onEdit={handleOpenModal} onDelete={(item) => { setSelectedAssignment(item); setDeleteDialogOpen(true); }} />
       )}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedAssignment ? "Editar Asignación" : "Nueva Asignación"} footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button onClick={handleSubmit} isLoading={isSubmitting}>{selectedAssignment ? "Guardar" : "Crear"}</Button></>}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Select label="Profesor" value={formData.teacher_id} onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value })} options={teachers.map((t) => ({ value: t.id, label: t.name }))} />
-          <Select label="Salón" value={formData.classroom_id} onChange={(e) => setFormData({ ...formData, classroom_id: e.target.value })} options={classrooms.map((c) => ({ value: c.id, label: c.name }))} />
-          <Select label="Materia" value={formData.subject_id} onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })} options={subjects.map((s) => ({ value: s.id, label: s.name }))} />
-          <Select label="Período" value={formData.school_period_id} onChange={(e) => setFormData({ ...formData, school_period_id: e.target.value })} options={periods.map((p) => ({ value: p.id, label: p.name }))} />
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedAssignment ? "Editar Asignación" : "Nueva Asignación"} footer={<><Button variant="outline" type="button" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" form="assignment-form" isLoading={isSubmitting}>{selectedAssignment ? "Guardar" : "Crear"}</Button></>}>
+        <form id="assignment-form" onSubmit={handleSubmit} className="space-y-4">
+          <Select label="Profesor" value={formData.teacher_id} onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value })} options={teachers.map((t) => ({ value: t.id, label: t.name }))} placeholder="Seleccionar profesor..." />
+          <Select label="Salón" value={formData.classroom_id} onChange={(e) => setFormData({ ...formData, classroom_id: e.target.value })} options={classrooms.map((c) => ({ value: c.id, label: c.name }))} placeholder="Seleccionar salón..." />
+          <Select label="Materia" value={formData.subject_id} onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })} options={subjects.map((s) => ({ value: s.id, label: s.name }))} placeholder="Seleccionar materia..." />
+          <Select label="Período" value={formData.school_period_id} onChange={(e) => setFormData({ ...formData, school_period_id: e.target.value })} options={periods.map((p) => ({ value: p.id, label: p.name }))} placeholder="Seleccionar período..." />
         </form>
       </Modal>
       <ConfirmDialog isOpen={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} onConfirm={handleDelete} title="Eliminar Asignación" message={`¿Eliminar esta asignación?`} details={["El profesor ya no estará vinculado a esta materia/salón", "Los horarios asociados quedarán sin profesor asignado"]} type="warning" confirmLabel="Quitar" isLoading={isSubmitting} />
