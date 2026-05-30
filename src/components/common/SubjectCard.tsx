@@ -3,7 +3,7 @@
 import {
   Calculator, BookOpen, Microscope, Globe, Dumbbell,
   Palette, Music, Monitor, Languages, Atom, ChevronDown,
-  FileText, Clock, Edit3, Download,
+  FileText, Clock, Edit3, Download, UserCheck,
 } from "lucide-react";
 import { type ReactNode } from "react";
 
@@ -85,12 +85,15 @@ interface SubjectCardProps {
   children: ReactNode;
   editable?: boolean;
   onEdit?: () => void;
+  teacherName?: string;
+  teacherEmail?: string;
 }
 
 export function SubjectCard({
   name, code, credits, classroomName,
   periodsCount, topicsCount, filesCount,
   expanded, onToggle, children, editable, onEdit,
+  teacherName, teacherEmail,
 }: SubjectCardProps) {
   const color = getSubjectColor(name);
   const Icon = getSubjectIcon(name);
@@ -119,6 +122,11 @@ export function SubjectCard({
                   {credits} cr
                 </span>
               </div>
+              {teacherName && (
+                <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
+                  <UserCheck className="w-3 h-3" /> {teacherName}
+                </p>
+              )}
             </div>
             <ChevronDown
               className={`w-5 h-5 text-slate-400 shrink-0 transition-transform duration-300 ${

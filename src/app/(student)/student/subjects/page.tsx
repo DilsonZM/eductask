@@ -17,6 +17,7 @@ interface CFile {
 interface SubjectData {
   id: string; name: string; code: string; credits: number;
   classroomSubjectId: string; classroomName: string;
+  teacherName: string; teacherEmail: string;
   curriculum: Record<string, { content: string | null; files: CFile[] }>;
 }
 
@@ -55,6 +56,18 @@ export default function SubjectsPage() {
       const { data: classroom } = await supabase
         .from("classrooms").select("name").eq("id", student.classroom_id).single();
 
+      const { data: teacherAssignments } = await supabase
+        .from("teacher_assignments")
+        .select("classroom_id, subject_id, teachers!inner(id, users!inner(name, email))")
+        .eq("classroom_id", student.classroom_id);
+      const teacherMap = new Map<string, { name: string; email: string }>();
+      (teacherAssignments || []).forEach((ta: any) => {
+        const t = ta.teachers;
+        if (t?.users && !teacherMap.has(ta.subject_id)) {
+          teacherMap.set(ta.subject_id, { name: t.users.name || "", email: t.users.email || "" });
+        }
+      });
+
       const curriculumMap: Record<string, Record<string, { content: string | null; files: CFile[] }>> = {};
 
       if (csIds.length > 0) {
@@ -89,10 +102,14 @@ export default function SubjectsPage() {
         .filter((cs) => cs.subjects && typeof cs.subjects === "object" && !Array.isArray(cs.subjects))
         .map((cs) => {
           const subj = cs.subjects as unknown as Record<string, unknown>;
+          const sid = subj.id as string;
+          const teacher = teacherMap.get(sid);
           return {
-            id: (subj.id as string) || cs.id, name: (subj.name as string) || "Sin nombre",
+            id: sid || cs.id, name: (subj.name as string) || "Sin nombre",
             code: (subj.code as string) || "", credits: (subj.credits as number) ?? 0,
             classroomSubjectId: cs.id, classroomName: cName,
+            teacherName: teacher?.name || "Sin asignar",
+            teacherEmail: teacher?.email || "",
             curriculum: curriculumMap[cs.id] || {},
           };
         });
@@ -198,6 +215,8 @@ export default function SubjectsPage() {
                 filesCount={Object.values(subject.curriculum).reduce((s, c) => s + c.files.length, 0)}
                 expanded={isExpanded}
                 onToggle={() => toggleExpand(subject.id)}
+                teacherName={subject.teacherName}
+                teacherEmail={subject.teacherEmail}
               >
                 <CurriculumView periods={cardPeriods} accentColor={color.active} />
               </SubjectCard>

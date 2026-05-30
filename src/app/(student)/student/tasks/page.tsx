@@ -18,6 +18,7 @@ import {
   Award,
   ExternalLink,
   X,
+  UserCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -42,6 +43,7 @@ interface TaskData {
   description: string | null;
   instructions: string | null;
   teacher_id: string | null;
+  teacherName: string;
   classroom_subject_id: string | null;
   due_date: string;
   max_score: number;
@@ -243,6 +245,16 @@ export default function TasksPage() {
       });
       setSubmissions(subsMap);
 
+      const teacherIds = Array.from(new Set(allTasksRaw.map((t) => t.teacher_id).filter(Boolean) as string[]));
+      const teacherMap = new Map<string, string>();
+      if (teacherIds.length > 0) {
+        const { data: teachersData } = await supabase
+          .from("teachers").select("id, users!inner(name)").in("id", teacherIds);
+        (teachersData || []).forEach((t: any) => {
+          teacherMap.set(t.id, t.users?.name || "Docente");
+        });
+      }
+
       const tasksData: TaskData[] = allTasksRaw.map((t) => {
         const subj = extractSubject(t);
         return {
@@ -251,6 +263,7 @@ export default function TasksPage() {
           description: t.description,
           instructions: t.instructions,
           teacher_id: t.teacher_id,
+          teacherName: teacherMap.get(t.teacher_id || "") || "Docente",
           classroom_subject_id: t.classroom_subject_id,
           due_date: t.due_date,
           max_score: t.max_score,
@@ -498,6 +511,11 @@ export default function TasksPage() {
                     <h3 className="font-semibold text-slate-900 mt-0.5 line-clamp-2 font-serif">
                       {task.title}
                     </h3>
+                    {task.teacherName && (
+                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <UserCheck className="w-3 h-3" /> {task.teacherName}
+                      </p>
+                    )}
                   </div>
                 </div>
 
