@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 
 interface NewsItem {
   id: string;
@@ -40,12 +39,7 @@ export function NewsCarousel({ news }: { news: NewsItem[] }) {
             <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
               {item.image && (
                 <div className="w-full h-40 bg-slate-100 rounded-xl mb-3 overflow-hidden relative">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    className="object-cover"
-                  />
+                  <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
                 </div>
               )}
               <h4 className="font-semibold text-slate-900 line-clamp-2 font-serif text-base">{item.title}</h4>
