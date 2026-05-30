@@ -351,12 +351,11 @@ export default function TasksPage() {
   }, [teacherId, fetchTasks]);
 
   useEffect(() => {
-    if (!formData.classroom_subject_id || !formData.school_period_id) { setConfigMaxScore(null); return; }
+    if (!formData.classroom_subject_id) { setConfigMaxScore(null); return; }
     supabaseRef.current.from("subject_grading_config")
-      .select("max_score").eq("classroom_subject_id", formData.classroom_subject_id)
-      .eq("school_period_id", formData.school_period_id).single()
+      .select("max_score").eq("classroom_subject_id", formData.classroom_subject_id).single()
       .then(({ data }) => setConfigMaxScore((data as any)?.max_score ?? null));
-  }, [formData.classroom_subject_id, formData.school_period_id]);
+  }, [formData.classroom_subject_id]);
 
   const resetForm = () => {
     setFormData({
@@ -492,8 +491,7 @@ export default function TasksPage() {
 
     if (status === "published") {
       const { data: config } = await supabaseRef.current.from("subject_grading_config")
-        .select("id").eq("classroom_subject_id", formData.classroom_subject_id)
-        .eq("school_period_id", formData.school_period_id).single();
+        .select("id").eq("classroom_subject_id", formData.classroom_subject_id).single();
       if (!config) {
         setShowConfigWarning(true);
         setIsSubmitting(false);
