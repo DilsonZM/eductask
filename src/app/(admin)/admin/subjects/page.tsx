@@ -446,6 +446,8 @@ export default function SubjectsPage() {
         <DataTable
           data={subjects}
           columns={columns}
+          searchPlaceholder="Buscar por nombre o código..."
+          searchKeys={["name", "code"]}
           extraActions={(subject) => (
             <button
               onClick={() => openTemario(subject)}

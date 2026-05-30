@@ -100,7 +100,7 @@ export default function EventsPage() {
       {!loading && events.length === 0 ? (
         <EmptyState title="No hay eventos" description="Comienza creando el primer evento" actionLabel="Nuevo Evento" onAction={() => handleOpenModal()} />
       ) : (
-        <DataTable isLoading={loading} data={events} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedEvent(item); setDeleteDialogOpen(true); }} />
+        <DataTable isLoading={loading} data={events} columns={columns} searchPlaceholder="Buscar por título..." searchKeys={["title"]} onEdit={handleOpenModal} onDelete={(item) => { setSelectedEvent(item); setDeleteDialogOpen(true); }} />
       )}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedEvent ? "Editar Evento" : "Nuevo Evento"} footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button onClick={handleSubmit} isLoading={isSubmitting}>{selectedEvent ? "Guardar" : "Crear"}</Button></>}>
         <form onSubmit={handleSubmit} className="space-y-4">

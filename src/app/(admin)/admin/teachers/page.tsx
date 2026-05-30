@@ -114,7 +114,7 @@ export default function TeachersPage() {
       {!loading && teachers.length === 0 ? (
         <EmptyState title="No hay profesores" description="Comienza agregando el primer profesor" actionLabel="Nuevo Profesor" onAction={() => handleOpenModal()} />
       ) : (
-        <DataTable isLoading={loading} data={teachers} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedTeacher(item); setDeleteDialogOpen(true); }} />
+        <DataTable isLoading={loading} data={teachers} columns={columns} searchPlaceholder="Buscar por nombre o código..." searchKeys={["first_name", "last_name", "employee_code"]} onEdit={handleOpenModal} onDelete={(item) => { setSelectedTeacher(item); setDeleteDialogOpen(true); }} />
       )}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedTeacher ? "Editar Profesor" : "Nuevo Profesor"} footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button onClick={handleSubmit} isLoading={isSubmitting}>{selectedTeacher ? "Guardar" : "Crear"}</Button></>}>
         <form onSubmit={handleSubmit} className="space-y-4">

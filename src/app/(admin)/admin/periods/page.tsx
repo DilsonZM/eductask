@@ -181,6 +181,8 @@ export default function PeriodsPage() {
         <DataTable
           data={periods}
           columns={columns}
+          searchPlaceholder="Buscar por nombre..."
+          searchKeys={["name"]}
           onEdit={handleOpenModal}
           onDelete={(item) => {
             setSelectedPeriod(item);

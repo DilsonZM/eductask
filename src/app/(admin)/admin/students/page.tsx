@@ -164,6 +164,8 @@ export default function StudentsPage() {
         <DataTable isLoading={loading}
           data={students}
           columns={columns}
+          searchPlaceholder="Buscar por nombre o código..."
+          searchKeys={["first_name", "last_name", "student_code"]}
           onEdit={handleOpenModal}
           onDelete={(item) => {
             setSelectedStudent(item);

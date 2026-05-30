@@ -164,6 +164,8 @@ export default function UsersPage() {
         <DataTable isLoading={loading}
           data={users}
           columns={columns}
+          searchPlaceholder="Buscar por nombre o email..."
+          searchKeys={["name", "email"]}
           onEdit={handleOpenModal}
           onDelete={(item) => {
             setSelectedUser(item);

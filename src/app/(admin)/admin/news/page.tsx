@@ -108,7 +108,7 @@ export default function NewsPage() {
       {!loading && news.length === 0 ? (
         <EmptyState title="No hay noticias" description="Comienza creando la primera noticia" actionLabel="Nueva Noticia" onAction={() => handleOpenModal()} />
       ) : (
-        <DataTable isLoading={loading} data={news} columns={columns} onEdit={handleOpenModal} onDelete={(item) => { setSelectedNews(item); setDeleteDialogOpen(true); }} />
+        <DataTable isLoading={loading} data={news} columns={columns} searchPlaceholder="Buscar por título..." searchKeys={["title"]} onEdit={handleOpenModal} onDelete={(item) => { setSelectedNews(item); setDeleteDialogOpen(true); }} />
       )}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={selectedNews ? "Editar Noticia" : "Nueva Noticia"} footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button><Button onClick={handleSubmit} isLoading={isSubmitting}>{selectedNews ? "Guardar" : "Crear"}</Button></>}>
         <form onSubmit={handleSubmit} className="space-y-4">
