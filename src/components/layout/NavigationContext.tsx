@@ -46,44 +46,70 @@ export function useNavigation() {
 function TransitionOverlay({ active }: { active: boolean }) {
   if (!active) return null;
 
+  const pieces = [
+    { x: -70, y: -55, r: -20, w: 26, h: 34 },
+    { x: 80, y: -45, r: 15, w: 30, h: 38 },
+    { x: -55, y: 60, r: 12, w: 22, h: 30 },
+    { x: 60, y: 50, r: -18, w: 28, h: 36 },
+    { x: -25, y: -70, r: -8, w: 24, h: 32 },
+    { x: 35, y: -25, r: 10, w: 32, h: 40 },
+    { x: -45, y: 15, r: -6, w: 22, h: 30 },
+    { x: 15, y: 35, r: -14, w: 26, h: 34 },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary-500 to-transparent animate-swipe-line" />
+      <div className="absolute inset-0 bg-white/55 backdrop-blur-[1px] animate-cloud" />
 
-      <div className="absolute inset-x-0 top-1/3 flex flex-col items-center justify-center gap-3">
-        <div className="flex items-end gap-[3px] h-8 animate-lines-in">
-          {[75, 55, 90, 40, 85, 60, 70, 45].map((w, i) => (
-            <div key={i} className="rounded-full bg-primary-500/70" style={{
-              width: `${w * 0.3}px`,
-              opacity: 0,
-              animation: `line-appear 0.5s ease-out ${i * 0.04}s forwards`,
-              height: '2px',
-            }} />
-          ))}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative w-20 h-28">
+          {pieces.map((p, i) => (
+            <div
+              key={i}
+              className="absolute rounded-lg bg-white border border-slate-200/60"
+              style={{
+                width: `${p.w}px`,
+                height: `${p.h}px`,
+                left: '50%',
+                top: '50%',
+                marginLeft: `-${p.w / 2}px`,
+                marginTop: `-${p.h / 2}px`,
+                animation: `assemble 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${i * 0.025}s forwards`,
+                '--tx': `${p.x}px`,
+                '--ty': `${p.y}px`,
+                '--tr': `${p.r}deg`,
+              } as React.CSSProperties}
+            >
+            <div className="px-2 py-1.5 space-y-1 opacity-30">
+              <div className="h-[1.5px] rounded-full bg-slate-300" style={{ width: `${60 + (i % 3) * 15}%` }} />
+              <div className="h-[1.5px] rounded-full bg-slate-200" />
+              <div className="h-[1.5px] rounded-full bg-slate-300" style={{ width: `${45 + (i % 4) * 12}%` }} />
+            </div>
+          </div>
+        ))}
         </div>
-        <div className="h-3 w-1.5 rounded-sm bg-primary-500 animate-pen-draw" />
       </div>
 
       <style jsx>{`
-        @keyframes swipe-line {
-          0% { transform: translateX(-100%); }
-          40% { transform: translateX(0); }
-          60% { transform: translateX(0); opacity: 1; }
-          100% { transform: translateX(100%); opacity: 0; }
+        @keyframes cloud {
+          0% { opacity: 0; }
+          30% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; }
         }
-        @keyframes line-appear {
-          0% { transform: scaleX(0); opacity: 0; }
-          100% { transform: scaleX(1); opacity: 1; }
+        @keyframes assemble {
+          0% {
+            transform: translate(var(--tx), var(--ty)) rotate(var(--tr)) scale(0.5);
+            opacity: 0.2;
+            box-shadow: 0 0 0 rgba(0,0,0,0);
+          }
+          100% {
+            transform: translate(0, 0) rotate(0deg) scale(1);
+            opacity: 1;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.06);
+          }
         }
-        @keyframes pen-draw {
-          0% { transform: translateX(-8px) rotate(-15deg); opacity: 0; }
-          40% { transform: translateX(0) rotate(0deg); opacity: 1; }
-          80% { transform: translateX(8px) rotate(5deg); opacity: 0.8; }
-          100% { transform: translateX(16px) rotate(10deg); opacity: 0; }
-        }
-        .animate-swipe-line { animation: swipe-line 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-        .animate-lines-in { animation: none; }
-        .animate-pen-draw { animation: pen-draw 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s forwards; }
+        .animate-cloud { animation: cloud 0.5s ease-out forwards; }
       `}</style>
     </div>
   );
