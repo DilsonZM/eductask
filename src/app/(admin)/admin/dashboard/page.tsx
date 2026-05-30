@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/utils";
 import { Users, UserCog, Building2, Calendar } from "lucide-react";
 import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeRefresh, RealtimeProgressBar } from "@/hooks/useRealtimeRefresh";
 
 interface DashboardStats {
   totalStudents: number;
@@ -93,7 +94,8 @@ export default function AdminDashboard() {
     };
   }, [fetchData]);
 
-  useRealtimeSubscription("teacher_assignments", undefined, () => fetchData());
+  const { isRefreshing, refresh } = useRealtimeRefresh(fetchData);
+  useRealtimeSubscription("teacher_assignments", undefined, () => refresh());
 
   if (loading) return (
     <div className="space-y-6">
@@ -109,7 +111,8 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-300 ${isRefreshing ? "opacity-70" : ""}`}>
+      <RealtimeProgressBar active={isRefreshing} />
       <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 p-6 md:p-8 shadow-soft">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>

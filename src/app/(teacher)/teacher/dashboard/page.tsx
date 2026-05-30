@@ -10,6 +10,7 @@ import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 import { BookOpen, CheckSquare, FileText, Users } from "lucide-react";
 import Link from "next/link";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeRefresh, RealtimeProgressBar } from "@/hooks/useRealtimeRefresh";
 
 interface NewsItem { id: string; title: string; published_at: string | null; }
 interface Event { id: string; title: string; start_date: string; color: string | null; location: string | null; }
@@ -116,9 +117,11 @@ export default function TeacherDashboard() {
     fetchData();
   }, [fetchData]);
 
-  useRealtimeSubscription("tasks", undefined, () => fetchData());
-  useRealtimeSubscription("submissions", undefined, () => fetchData());
-  useRealtimeSubscription("teacher_assignments", undefined, () => fetchData());
+  const { isRefreshing, refresh } = useRealtimeRefresh(fetchData);
+
+  useRealtimeSubscription("tasks", undefined, () => refresh());
+  useRealtimeSubscription("submissions", undefined, () => refresh());
+  useRealtimeSubscription("teacher_assignments", undefined, () => refresh());
 
   const calendarEvents = useMemo((): CalendarEvent[] => {
     const result: CalendarEvent[] = [];
@@ -174,7 +177,8 @@ export default function TeacherDashboard() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-300 ${isRefreshing ? "opacity-70" : ""}`}>
+      <RealtimeProgressBar active={isRefreshing} />
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
           Panel del Profesor
