@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/common/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Modal, ConfirmDialog } from "@/components/ui/Modal";
+import { createNotifications } from "@/lib/notifications";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
@@ -125,6 +126,19 @@ export default function AssignmentsPage() {
         if (error) throw error;
       }
       toast.success(selectedAssignment ? "Asignación actualizada" : "Asignación creada");
+      const { data: teacher } = await supabase.from("teachers").select("user_id, first_name").eq("id", formData.teacher_id).single();
+      if (teacher) {
+        const classroomName = classrooms.find((c) => c.id === formData.classroom_id)?.name || "un salón";
+        const subjectName = subjects.find((s) => s.id === formData.subject_id)?.name || "una materia";
+        const periodName = periods.find((p) => p.id === formData.school_period_id)?.name || "un período";
+        await createNotifications([{
+          user_id: teacher.user_id,
+          type: "assignment",
+          title: selectedAssignment ? "Asignación actualizada" : "Nueva asignación",
+          message: `Plantel académico te asignó a ${classroomName} - ${subjectName} (${periodName})`,
+          link: "/teacher/subjects",
+        }]);
+      }
       setModalOpen(false);
       await fetchData();
     } catch (error: any) {

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
 import type { Tables } from "@/types/database";
 import toast from "react-hot-toast";
+import { createNotifications } from "@/lib/notifications";
 
 type Event = Tables<"events">;
 
@@ -65,6 +66,20 @@ export default function EventsPage() {
         await supabaseRef.current.from("events").insert([formData]);
       }
       toast.success(selectedEvent ? "Evento actualizado" : "Evento creado");
+      if (!selectedEvent) {
+        const { data: users } = await supabaseRef.current.from("users").select("id").neq("role", "admin");
+        if (users?.length) {
+          const dateStr = formData.start_date
+            ? new Date(formData.start_date).toLocaleDateString("es-ES", { day: "numeric", month: "short" })
+            : "";
+          await createNotifications(users.map((u: { id: string }) => ({
+            user_id: u.id,
+            type: "announcement",
+            title: "📅 " + formData.title,
+            message: `${dateStr}${formData.location ? ` - ${formData.location}` : ""}${formData.description ? `\n${formData.description}` : ""}`,
+          })));
+        }
+      }
       setModalOpen(false);
       fetchData();
     } catch (error) {

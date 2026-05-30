@@ -13,6 +13,7 @@ import {
   type ScheduleSlot,
 } from "@/components/common/TimetableGrid";
 import toast from "react-hot-toast";
+import { createNotifications } from "@/lib/notifications";
 import type { Tables } from "@/types/database";
 
 type Subject = Tables<"subjects">;
@@ -202,6 +203,21 @@ export default function SchedulesPage() {
       if (error) throw error;
 
       toast.success("Horario agregado");
+      if (formData.teacher_id) {
+        const { data: teacher } = await supabaseRef.current.from("teachers").select("user_id, first_name").eq("id", formData.teacher_id).single();
+        if (teacher) {
+          const subjName = subjects.find((s) => s.id === formData.subject_id)?.name || "una materia";
+          const dayNames = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+          const dayName = dayNames[parseInt(formData.day_of_week)] || "un día";
+          await createNotifications([{
+            user_id: teacher.user_id,
+            type: "system",
+            title: "Horario asignado",
+            message: `Plantel académico te asignó ${subjName} el ${dayName} de ${formData.start_time} a ${formData.end_time}`,
+            link: "/teacher/schedule",
+          }]);
+        }
+      }
       setModalOpen(false);
       setFormData({
         classroom_id: "",

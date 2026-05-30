@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
 import type { Tables } from "@/types/database";
 import toast from "react-hot-toast";
+import { createNotifications } from "@/lib/notifications";
 
 type News = Tables<"news">;
 
@@ -72,6 +73,18 @@ export default function NewsPage() {
         await supabaseRef.current.from("news").insert([data]);
       }
       toast.success(selectedNews ? "Noticia actualizada" : "Noticia creada");
+      if (!selectedNews && formData.is_published) {
+        const { data: users } = await supabaseRef.current.from("users").select("id").neq("role", "admin");
+        if (users?.length) {
+          const excerpt = formData.excerpt || formData.content.slice(0, 100);
+          await createNotifications(users.map((u: { id: string }) => ({
+            user_id: u.id,
+            type: "announcement",
+            title: "📰 " + formData.title,
+            message: excerpt,
+          })));
+        }
+      }
       setModalOpen(false);
       fetchData();
     } catch (error) {
