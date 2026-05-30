@@ -113,6 +113,45 @@ export function DataTable<T extends { id: string }>({
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/80">
+              <span className="text-xs text-slate-500">
+                {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} de {filtered.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="p-1 rounded hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 text-slate-600" />
+                </button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const start = Math.max(0, Math.min(page - 2, totalPages - 5));
+                  const p = start + i;
+                  if (p >= totalPages) return null;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-7 h-7 rounded text-xs font-medium transition ${
+                        p === page ? "bg-primary-500 text-white" : "hover:bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {p + 1}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="p-1 rounded hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-[720px] w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
@@ -167,42 +206,10 @@ export function DataTable<T extends { id: string }>({
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50/50">
-              <span className="text-xs text-slate-500">
-                {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} de {filtered.length}
+            <div className="flex items-center justify-center px-4 py-2 border-t border-slate-100 bg-slate-50/50">
+              <span className="text-xs text-slate-400">
+                Página {page + 1} de {totalPages}
               </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  <ChevronLeft className="w-4 h-4 text-slate-600" />
-                </button>
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  const start = Math.max(0, Math.min(page - 2, totalPages - 5));
-                  const p = start + i;
-                  if (p >= totalPages) return null;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`w-8 h-8 rounded-lg text-xs font-medium transition ${
-                        p === page ? "bg-primary-500 text-white" : "hover:bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {p + 1}
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  <ChevronRight className="w-4 h-4 text-slate-600" />
-                </button>
-              </div>
             </div>
           )}
         </div>
