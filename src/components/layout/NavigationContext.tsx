@@ -52,10 +52,7 @@ function TransitionOverlay({ active }: { active: boolean }) {
 
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative flex items-center justify-center">
-          <div className="absolute w-16 h-16 rounded-full border-[3px] border-primary-100 animate-ring" />
-          <div className="absolute w-16 h-16 rounded-full border-[3px] border-transparent border-t-primary-500 animate-ring-spin" />
-
-          <div className="relative w-14 h-16 animate-book">
+          <div className="relative w-14 h-16 z-10 animate-book">
             <div className="absolute inset-0 rounded-r-lg rounded-l-sm bg-white border border-slate-300 shadow-md flex items-center justify-center">
               <div className="absolute left-2 right-2 top-3 space-y-1.5">
                 <div className="h-[1.5px] rounded-full bg-slate-300" />
@@ -70,6 +67,9 @@ function TransitionOverlay({ active }: { active: boolean }) {
               </div>
             </div>
           </div>
+
+          <div className="absolute w-24 h-24 rounded-full border-[3px] border-primary-100 animate-ring" />
+          <div className="absolute w-24 h-24 rounded-full border-[3px] border-transparent border-t-primary-500 animate-ring-spin" />
         </div>
       </div>
 
