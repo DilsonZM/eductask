@@ -14,6 +14,7 @@ import Link from "next/link";
 interface TaskRow { id: string; title: string; category: string; dueDate: string; score: number | null; }
 interface ExemptionRow { id: string; category: string; auto_score: number; reason: string | null; }
 interface CategoryData { tasks: TaskRow[]; exemption: ExemptionRow | null; avg: number | null; }
+interface SubHistory { taskTitle: string; category: string; fileName: string; filePath: string; submittedAt: string | null; comments: string | null; score: number | null; dueDate: string; }
 
 const CATEGORY_LABELS: Record<string, string> = {
   taller: "Taller", trabajo: "Trabajo", quiz: "Quiz", participacion: "Participación", examen_final: "Examen Final",
@@ -35,6 +36,7 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
   const [categories, setCategories] = useState<Record<string, CategoryData>>({});
   const [exemptions, setExemptions] = useState<ExemptionRow[]>([]);
   const [weightedAvg, setWeightedAvg] = useState<number | null>(null);
+  const [subsHistory, setSubsHistory] = useState<SubHistory[]>([]);
 
   const [exemptModal, setExemptModal] = useState(false);
   const [exemptCategory, setExemptCategory] = useState("");
@@ -67,7 +69,7 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
 
       const taskIds = (tasks || []).map((t) => t.id);
       const { data: subs } = taskIds.length > 0 ? await supabaseRef.current.from("submissions")
-        .select("id, task_id, student_id, score, file_path, file_name, submitted_at").eq("student_id", studentId).in("task_id", taskIds) : { data: [] };
+        .select("id, task_id, student_id, score, file_path, file_name, submitted_at, comments").eq("student_id", studentId).in("task_id", taskIds) : { data: [] };
 
       const { data: exemptData } = await supabaseRef.current.from("exemptions")
         .select("*").eq("student_id", studentId).eq("classroom_subject_id", csId);
@@ -89,6 +91,20 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
       });
 
       setCategories(cats);
+
+      const history: SubHistory[] = [];
+      const taskMap = new Map((tasks || []).map((t) => [t.id, t]));
+      (subs || []).forEach((s) => {
+        const t = taskMap.get(s.task_id);
+        history.push({
+          taskTitle: t?.title || "Tarea",
+          category: t?.category || "",
+          fileName: s.file_name || "", filePath: s.file_path || "",
+          submittedAt: s.submitted_at, comments: s.comments || null,
+          score: s.score, dueDate: t?.due_date || "",
+        });
+      });
+      setSubsHistory(history);
 
       let wSum = 0, wCount = 0;
       CAT_ORDER.forEach((cat) => {
@@ -254,6 +270,60 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
               </table>
             </div>
           </div>
+
+          {subsHistory.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/80">
+                <h3 className="font-semibold text-slate-900">Historial de entregas</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50/50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">Tarea</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">Categoría</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">Entrega</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">Archivo</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-500 uppercase">Nota</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {subsHistory.map((h, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-2.5 text-sm text-slate-800">{h.taskTitle}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">{CATEGORY_LABELS[h.category] || h.category}</td>
+                        <td className="px-4 py-2.5 text-xs">
+                          {h.submittedAt ? (
+                            <span className={cn(
+                              new Date(h.submittedAt) > new Date(h.dueDate) ? "text-red-600" : "text-emerald-600"
+                            )}>
+                              {new Date(h.submittedAt).toLocaleDateString("es-ES")}
+                              {new Date(h.submittedAt) > new Date(h.dueDate) ? " (Tarde)" : " (A tiempo)"}
+                            </span>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {h.filePath ? (
+                            <a href={supabaseRef.current.storage.from("edutask-submissions").getPublicUrl(h.filePath).data.publicUrl}
+                              target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1">
+                              <FileText className="w-3 h-3" /> {h.fileName}
+                            </a>
+                          ) : <span className="text-xs text-slate-400">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-center text-sm font-medium">
+                          {h.score !== null ? (
+                            <span className={cn("rounded-lg px-2 py-0.5 text-xs font-semibold border",
+                              h.score >= 3.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200")}>{h.score}</span>
+                          ) : <span className="text-slate-300">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 
