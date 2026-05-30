@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { NotebookLoader } from "@/components/common/NotebookLoader";
 import { LogoutOverlay } from "@/components/common/LogoutOverlay";
 import { ConfirmDialog } from "@/components/ui/Modal";
-import { NavigationProvider, NavigationOverlay } from "@/components/layout/NavigationContext";
+import { NavigationProvider } from "@/components/layout/NavigationContext";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -47,7 +47,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
         </div>
       </div>
-      <NavigationOverlay />
     </NavigationProvider>
   );
 }
