@@ -2,11 +2,12 @@
 
 import type { AuthUser } from "@/hooks/useAuth";
 import { getInitials } from "@/lib/utils";
-import { Bell, LogOut, User, X } from "lucide-react";
+import { LogOut, User, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { MotivationalTicker } from "@/components/common/MotivationalTicker";
+import { NotificationBell } from "@/components/common/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useRef, useState } from "react";
@@ -181,10 +182,7 @@ export function AppHeader({ title, description, user: propUser, onLogout, onMenu
           </div>
         )}
 
-        <button className="relative p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition flex-shrink-0">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </button>
+        <NotificationBell userId={user?.id || ""} />
 
         <button
           type="button"

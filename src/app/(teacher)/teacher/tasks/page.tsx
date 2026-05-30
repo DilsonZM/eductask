@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
 import type { Tables } from "@/types/database";
 import toast from "react-hot-toast";
+import { createNotifications } from "@/lib/notifications";
 import { X, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
@@ -532,6 +533,22 @@ export default function TasksPage() {
         if (error) { toast.error("Error al crear"); return; }
         if (created && attachments.length > 0) await uploadFiles(created.id);
         toast.success(status === "published" ? "Tarea publicada" : "Borrador guardado");
+        if (status === "published" && created) {
+          const { data: cs } = await supabaseRef.current.from("classroom_subjects").select("classroom_id, subjects(name)").eq("id", formData.classroom_subject_id).single();
+          if (cs) {
+            const { data: students } = await supabaseRef.current.from("students").select("user_id").eq("classroom_id", (cs as any).classroom_id);
+            const subjectName = (cs as any).subjects?.name || "tu materia";
+            if (students?.length) {
+              await createNotifications(students.map((s: { user_id: string }) => ({
+                user_id: s.user_id,
+                type: "task" as const,
+                title: "Nueva tarea publicada",
+                message: `${formData.title.trim()} - ${subjectName}`,
+                link: "/student/tasks",
+              })));
+            }
+          }
+        }
       }
       setModalOpen(false);
       resetForm();

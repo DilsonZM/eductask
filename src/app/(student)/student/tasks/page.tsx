@@ -21,6 +21,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { createNotifications } from "@/lib/notifications";
 
 interface TaskRaw {
   id: string;
@@ -388,6 +389,18 @@ export default function TasksPage() {
       }
 
       toast.success("Tarea entregada correctamente");
+      if (selectedTask?.teacher_id) {
+        const { data: teacher } = await supabase.from("teachers").select("user_id, first_name").eq("id", selectedTask.teacher_id).single();
+        if (teacher) {
+          await createNotifications([{
+            user_id: teacher.user_id,
+            type: "submission",
+            title: "Nueva entrega recibida",
+            message: `Un alumno entregó "${selectedTask.title}"`,
+            link: "/teacher/submissions",
+          }]);
+        }
+      }
       setUploadFiles([]);
       setComments("");
       if (fileInputRef.current) fileInputRef.current.value = "";

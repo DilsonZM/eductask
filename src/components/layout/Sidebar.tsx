@@ -163,8 +163,12 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
           const { count: tasksCount } = await supabase.from("tasks").select("*", { count: "exact", head: true }).eq("teacher_id", teacher.id).eq("status", "published");
           if (tasksCount != null) counts["tasks"] = tasksCount;
 
-          const { count: submissionsCount } = await supabase.from("submissions").select("*", { count: "exact", head: true }).is("score", null);
-          if (submissionsCount != null) counts["submissions"] = submissionsCount;
+          const { data: teacherTasks } = await supabase.from("tasks").select("id").eq("teacher_id", teacher.id);
+          const taskIds = teacherTasks?.map((t: { id: string }) => t.id) || [];
+          if (taskIds.length > 0) {
+            const { count: submissionsCount } = await supabase.from("submissions").select("*", { count: "exact", head: true }).in("task_id", taskIds).is("score", null);
+            if (submissionsCount != null) counts["submissions"] = submissionsCount;
+          }
 
           const { count: gradesCount } = await supabase.from("grades").select("*", { count: "exact", head: true }).eq("teacher_id", teacher.id);
           if (gradesCount != null) counts["grades"] = gradesCount;
@@ -279,10 +283,10 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
                       <span className="flex-1">{link.label}</span>
                       {badgeCount != null && badgeCount > 0 ? (
                         <span className={cn(
-                          "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold rounded-full",
+                          "inline-flex items-center justify-center min-w-[18px] h-4.5 px-1 text-[10px] font-semibold rounded-full",
                           isActive
-                            ? "bg-primary-600 text-white"
-                            : "bg-red-500 text-white"
+                            ? "bg-primary-100 text-primary-700"
+                            : "bg-rose-50 text-rose-500"
                         )}>
                           {badgeCount}
                         </span>

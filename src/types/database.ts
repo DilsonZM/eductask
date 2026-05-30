@@ -751,8 +751,39 @@ export interface Database {
           updated_at?: string;
         };
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: "task" | "submission" | "grade" | "announcement" | "assignment" | "system";
+          title: string;
+          message: string | null;
+          link: string | null;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: "task" | "submission" | "grade" | "announcement" | "assignment" | "system";
+          title: string;
+          message?: string | null;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: "task" | "submission" | "grade" | "announcement" | "assignment" | "system";
+          title?: string;
+          message?: string | null;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+        };
+      };
     };
-    Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: Record<string, never>;
   };

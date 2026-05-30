@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { createNotifications } from "@/lib/notifications";
 import { Save, ExternalLink, Clock, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -260,6 +261,18 @@ export default function SubmissionsPage() {
       }
 
       toast.success("Calificación guardada");
+      if (submission && score != null) {
+        const { data: student } = await supabaseRef.current.from("students").select("user_id, first_name").eq("id", submission.student_id).single();
+        if (student) {
+          await createNotifications([{
+            user_id: student.user_id,
+            type: "grade",
+            title: "Tarea calificada",
+            message: `Recibiste ${score} en "${task?.title || "una tarea"}"`,
+            link: "/student/grades",
+          }]);
+        }
+      }
     } catch (error) {
       console.error("Error saving grade:", error);
       toast.error("Error al guardar la calificación");
