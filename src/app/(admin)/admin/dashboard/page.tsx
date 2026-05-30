@@ -7,6 +7,7 @@ import { NewsCarousel } from "@/components/common/NewsCarousel";
 import { formatDate } from "@/lib/utils";
 import { Users, UserCog, Building2, Calendar } from "lucide-react";
 import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface DashboardStats {
   totalStudents: number;
@@ -91,6 +92,8 @@ export default function AdminDashboard() {
       cancelled = true;
     };
   }, [fetchData]);
+
+  useRealtimeSubscription("teacher_assignments", undefined, () => fetchData());
 
   if (loading) return (
     <div className="space-y-6">

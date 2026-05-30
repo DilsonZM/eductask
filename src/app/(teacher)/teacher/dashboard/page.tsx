@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/utils";
 import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 import { BookOpen, CheckSquare, FileText, Users } from "lucide-react";
 import Link from "next/link";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface NewsItem { id: string; title: string; published_at: string | null; }
 interface Event { id: string; title: string; start_date: string; color: string | null; location: string | null; }
@@ -114,6 +115,10 @@ export default function TeacherDashboard() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useRealtimeSubscription("tasks", undefined, () => fetchData());
+  useRealtimeSubscription("submissions", undefined, () => fetchData());
+  useRealtimeSubscription("teacher_assignments", undefined, () => fetchData());
 
   const calendarEvents = useMemo((): CalendarEvent[] => {
     const result: CalendarEvent[] = [];

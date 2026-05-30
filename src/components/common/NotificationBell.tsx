@@ -5,6 +5,7 @@ import { Bell, Check, FileText, GraduationCap, Megaphone, ClipboardList, Setting
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/types/database";
 import { useNavigation } from "@/components/layout/NavigationContext";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 type Notification = Tables<"notifications">;
 
@@ -66,9 +67,11 @@ export function NotificationBell({ userId }: NotificationBellProps) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, [fetchNotifications]);
+
+  useRealtimeSubscription("notifications", `user_id=eq.${userId}`, () => {
+    fetchNotifications();
+  });
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

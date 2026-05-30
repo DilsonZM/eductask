@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { BookOpen, FileText, Clock, Award, Calendar } from "lucide-react";
 import { ShimmerCard, ShimmerTable } from "@/components/common/SkeletonLoader";
 import Link from "next/link";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface NewsItem { id: string; title: string; excerpt: string | null; image: string | null; published_at: string | null; }
 interface Task { id: string; title: string; due_date: string; max_score: number; }
@@ -111,6 +112,8 @@ export default function StudentDashboard() {
       fetchData();
     }
   }, [authLoading, fetchData]);
+
+  useRealtimeSubscription("tasks", undefined, () => fetchData());
 
   const calendarEvents = useMemo((): CalendarEvent[] => {
     const result: CalendarEvent[] = [];
