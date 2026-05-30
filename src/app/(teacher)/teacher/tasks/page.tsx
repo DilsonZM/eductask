@@ -102,6 +102,7 @@ export default function TasksPage() {
     max_score: "10",
     allow_late: true,
     status: "draft" as "draft" | "published",
+    category: "" as string,
   });
 
   const [classrooms, setClassrooms] = useState<SelectOption[]>([]);
@@ -347,6 +348,7 @@ export default function TasksPage() {
       max_score: "10",
       allow_late: true,
       status: "draft",
+      category: "",
     });
     setModalSubjects([]);
     setAttachments([]);
@@ -380,6 +382,7 @@ export default function TasksPage() {
         max_score: String(task.max_score),
         allow_late: task.allow_late,
         status: task.status as "draft" | "published",
+        category: (task as any).category || "",
       });
 
       const { data: attData } = await supabaseRef.current
@@ -465,6 +468,17 @@ export default function TasksPage() {
     if (!formData.title.trim()) { toast.error("El título es obligatorio"); return; }
     if (!formData.classroom_subject_id) { toast.error("Seleccione salón y materia"); return; }
     if (!formData.due_date) { toast.error("Fecha límite obligatoria"); return; }
+    if (!formData.category && status === "published") { toast.error("Seleccione una categoría"); return; }
+
+    if (status === "published") {
+      const { data: config } = await supabaseRef.current.from("subject_grading_config")
+        .select("id").eq("classroom_subject_id", formData.classroom_subject_id)
+        .eq("school_period_id", formData.school_period_id).single();
+      if (!config) {
+        toast.error("Debes configurar la evaluación antes de publicar. Ve a Configurar Evaluación.");
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -480,6 +494,7 @@ export default function TasksPage() {
         status,
       };
       if (formData.school_period_id) payload.school_period_id = formData.school_period_id;
+      if (formData.category) payload.category = formData.category;
 
       if (selectedTask) {
         const { error } = await supabaseRef.current.from("tasks").update(payload).eq("id", selectedTask.id);
@@ -673,12 +688,25 @@ export default function TasksPage() {
               disabled={!formData.classroom_id || loadingModalSubjects}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Select
               label="Período"
               value={formData.school_period_id}
               onChange={(e) => setFormData({ ...formData, school_period_id: e.target.value })}
               options={[{ value: "", label: "Sin período" }, ...periods]}
+            />
+            <Select
+              label="Categoría"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              options={[
+                { value: "", label: "Seleccionar..." },
+                { value: "taller", label: "Taller" },
+                { value: "trabajo", label: "Trabajo" },
+                { value: "quiz", label: "Quiz" },
+                { value: "participacion", label: "Participación" },
+                { value: "examen_final", label: "Examen Final" },
+              ]}
             />
             <Input label="Puntaje máximo" type="number" value={formData.max_score} onChange={(e) => setFormData({ ...formData, max_score: e.target.value })} min="1" />
             <div className="flex flex-col justify-end pb-1">
