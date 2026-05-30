@@ -85,6 +85,10 @@ export default function GradesPage() {
     finally { setLoading(false); }
   }, [user]);
 
+  useEffect(() => {
+    if (!authLoading) fetchData();
+  }, [authLoading, fetchData]);
+
   const calculateCats = useCallback((csId: string, cfg: GradingConfig | undefined, scores: number[], exs: any[]) => {
     if (!cfg) { setCategories({}); setWeightedAvg(null); return; }
 
