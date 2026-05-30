@@ -100,7 +100,6 @@ export default function TasksPage() {
     description: "",
     instructions: "",
     due_date: "",
-    max_score: "10",
     allow_late: true,
     status: "draft" as "draft" | "published",
     category: "" as string,
@@ -133,13 +132,20 @@ export default function TasksPage() {
   }, [user]);
 
   const loadClassrooms = useCallback(async () => {
+    if (!teacherId) return;
     const { data } = await supabaseRef.current
-      .from("classrooms")
-      .select("id, name")
-      .eq("status", "active")
-      .order("name");
-    if (data) setClassrooms(data.map((c) => ({ value: c.id, label: c.name })));
-  }, []);
+      .from("teacher_assignments")
+      .select("classroom_id, classrooms!inner(id, name)")
+      .eq("teacher_id", teacherId);
+    if (data) {
+      const seen = new Map<string, string>();
+      for (const r of data) {
+        const c = (r as any).classrooms as { id: string; name: string } | null;
+        if (c && r.classroom_id && !seen.has(r.classroom_id)) seen.set(r.classroom_id, c.name);
+      }
+      setClassrooms(Array.from(seen.entries()).map(([id, name]) => ({ value: id, label: name })));
+    }
+  }, [teacherId]);
 
   const loadPeriods = useCallback(async () => {
     const { data: yearData } = await supabaseRef.current
@@ -162,15 +168,17 @@ export default function TasksPage() {
 
   const loadSubjectsForClassroom = useCallback(
     async (classroomId: string, target: "modal" | "filter") => {
+      if (!classroomId) {
+        if (target === "modal") setModalSubjects([]);
+        else setFilterSubjects([]);
+        return;
+      }
       if (target === "modal") setLoadingModalSubjects(true);
 
       let query = supabaseRef.current
         .from("classroom_subjects")
-        .select("id, subjects!inner(id, name)");
-
-      if (classroomId) {
-        query = query.eq("classroom_id", classroomId);
-      }
+        .select("id, subjects!inner(id, name)")
+        .eq("classroom_id", classroomId);
 
       const { data } = await query;
 
@@ -330,10 +338,12 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadTeacherId();
-    loadClassrooms();
     loadPeriods();
-    loadSubjectsForClassroom("", "filter");
-  }, [loadTeacherId, loadClassrooms, loadPeriods, loadSubjectsForClassroom]);
+  }, [loadTeacherId, loadPeriods]);
+
+  useEffect(() => {
+    if (teacherId) loadClassrooms();
+  }, [teacherId, loadClassrooms]);
 
   useEffect(() => {
     if (teacherId) fetchTasks();
@@ -356,7 +366,6 @@ export default function TasksPage() {
       description: "",
       instructions: "",
       due_date: "",
-      max_score: "10",
       allow_late: true,
       status: "draft",
       category: "",
@@ -390,7 +399,6 @@ export default function TasksPage() {
         description: task.description || "",
         instructions: task.instructions || "",
         due_date: task.due_date ? task.due_date.slice(0, 16) : "",
-        max_score: String(task.max_score),
         allow_late: task.allow_late,
         status: task.status as "draft" | "published",
         category: (task as any).category || "",
@@ -501,7 +509,7 @@ export default function TasksPage() {
         teacher_id: teacherId,
         classroom_subject_id: formData.classroom_subject_id,
         due_date: new Date(formData.due_date).toISOString(),
-        max_score: Number(formData.max_score) || 10,
+        max_score: configMaxScore || 10,
         allow_late: formData.allow_late,
         status,
       };
@@ -734,14 +742,17 @@ export default function TasksPage() {
                 { value: "examen_final", label: "Examen Final" },
               ]}
             />
-            {configMaxScore && (
+            {configMaxScore ? (
               <div className="flex flex-col justify-end pb-1">
                 <p className="text-xs text-slate-500">
-                  Tope configurado: <strong className="text-slate-700">0 – {configMaxScore}</strong>
+                  Puntaje: <strong className="text-slate-700">0 – {configMaxScore}</strong>
                 </p>
               </div>
+            ) : (
+              <div className="flex flex-col justify-end pb-1">
+                <p className="text-xs text-slate-400">Sin tope configurado</p>
+              </div>
             )}
-            <Input label="Puntaje máximo" type="number" value={formData.max_score} onChange={(e) => setFormData({ ...formData, max_score: e.target.value })} min="1" max={configMaxScore || undefined} />
             <div className="flex flex-col justify-end pb-1">
               <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                 <input type="checkbox" checked={formData.allow_late} onChange={(e) => setFormData({ ...formData, allow_late: e.target.checked })} className="rounded border-slate-300" />
