@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Modal, ConfirmDialog } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import type { Tables } from "@/types/database";
 
@@ -105,10 +106,12 @@ export default function StudentsPage() {
       } else {
         await supabaseRef.current.from("students").insert([formData]);
       }
+      toast.success(selectedStudent ? "Alumno actualizado" : "Alumno creado");
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error saving student:", error);
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }

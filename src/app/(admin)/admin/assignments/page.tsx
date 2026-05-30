@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Modal, ConfirmDialog } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import toast from "react-hot-toast";
 
 interface AssignmentWithDetails {
   id: string;
@@ -119,10 +120,12 @@ export default function AssignmentsPage() {
         const { error } = await supabase.from("teacher_assignments").insert([formData]);
         if (error) console.error("Error:", error);
       }
+      toast.success(selectedAssignment ? "Asignación actualizada" : "Asignación creada");
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error:", error);
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }

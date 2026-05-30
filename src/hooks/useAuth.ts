@@ -24,21 +24,25 @@ export function useAuth() {
   const supabaseRef = useRef(createClient());
 
   const getProfile = useCallback(async (userId: string) => {
-    const { data: profile } = await supabaseRef.current
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    try {
+      const { data: profile } = await supabaseRef.current
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
-    if (profile) {
-      setUser({
-        id: profile.id,
-        email: profile.email,
-        role: profile.role as UserRole,
-        name: profile.name,
-        avatar: profile.avatar ?? null,
-        phone: profile.phone ?? null,
-      });
+      if (profile) {
+        setUser({
+          id: profile.id,
+          email: profile.email,
+          role: profile.role as UserRole,
+          name: profile.name,
+          avatar: profile.avatar ?? null,
+          phone: profile.phone ?? null,
+        });
+      }
+    } catch {
+      // Profile may not exist (stale session after DB reset)
     }
   }, []);
 

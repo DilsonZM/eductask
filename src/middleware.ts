@@ -60,13 +60,23 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    let profile = null;
+    try {
+      const { data } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      profile = data;
+    } catch {
+      // User not found in public.users (stale session after DB reset)
+    }
 
-    const role = profile?.role || "student";
+    if (!profile) {
+      return redirectWithCookies(new URL("/login", request.url), supabaseResponse);
+    }
+
+    const role = profile.role || "student";
 
     if (isAuthPage) {
       if (role === "admin") {

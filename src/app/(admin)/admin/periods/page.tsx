@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import type { Tables } from "@/types/database";
+import toast from "react-hot-toast";
 
 type Period = Tables<"school_periods">;
 
@@ -126,11 +127,12 @@ export default function PeriodsPage() {
       } else {
         await supabaseRef.current.from("school_periods").insert([data]);
       }
+      toast.success(selectedPeriod ? "Período actualizado" : "Período creado");
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error:", error);
-      setError("Error al guardar el período");
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }

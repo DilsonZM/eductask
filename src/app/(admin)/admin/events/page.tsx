@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
 import type { Tables } from "@/types/database";
+import toast from "react-hot-toast";
 
 type Event = Tables<"events">;
 
@@ -63,10 +64,12 @@ export default function EventsPage() {
       } else {
         await supabaseRef.current.from("events").insert([formData]);
       }
+      toast.success(selectedEvent ? "Evento actualizado" : "Evento creado");
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error:", error);
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }

@@ -9,6 +9,7 @@ import { Modal, ConfirmDialog } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import type { Tables } from "@/types/database";
+import toast from "react-hot-toast";
 
 type Teacher = Tables<"teachers">;
 
@@ -72,13 +73,16 @@ export default function TeachersPage() {
     try {
       if (selectedTeacher) {
         await supabaseRef.current.from("teachers").update(formData).eq("id", selectedTeacher.id);
+        toast.success("Profesor actualizado");
       } else {
         await supabaseRef.current.from("teachers").insert([formData]);
+        toast.success("Profesor creado");
       }
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error saving teacher:", error);
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }
@@ -89,11 +93,13 @@ export default function TeachersPage() {
     setIsSubmitting(true);
     try {
       await supabaseRef.current.from("teachers").delete().eq("id", selectedTeacher.id);
+      toast.success("Profesor eliminado");
       setDeleteDialogOpen(false);
       setSelectedTeacher(null);
       fetchData();
     } catch (error) {
       console.error("Error deleting teacher:", error);
+      toast.error("Error al eliminar");
     } finally {
       setIsSubmitting(false);
     }

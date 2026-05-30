@@ -9,6 +9,7 @@ import { Modal, ConfirmDialog } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import toast from "react-hot-toast";
 
 interface Classroom {
   id: string;
@@ -90,10 +91,12 @@ export default function ClassroomsPage() {
         const { error } = await supabase.from("classrooms").insert([data]);
         if (error) console.error("Error:", error);
       }
+      toast.success(selectedClassroom ? "Salón actualizado" : "Salón creado");
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error:", error);
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }

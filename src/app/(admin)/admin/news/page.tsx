@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
 import type { Tables } from "@/types/database";
+import toast from "react-hot-toast";
 
 type News = Tables<"news">;
 
@@ -70,10 +71,12 @@ export default function NewsPage() {
       } else {
         await supabaseRef.current.from("news").insert([data]);
       }
+      toast.success(selectedNews ? "Noticia actualizada" : "Noticia creada");
       setModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Error:", error);
+      toast.error("Error al guardar");
     } finally {
       setIsSubmitting(false);
     }
