@@ -42,19 +42,26 @@ edutask/
 │   │   ├── ui/                     # Button, Input, Select, Modal (ConfirmDialog)
 │   │   ├── layout/                 # Sidebar, AppHeader, NavigationContext
 │   │   └── common/                 # DataTable, EmptyState, PageHeader, StatsCard,
-│   │                                # NewsCarousel, SkeletonLoader, NotificationBell
+│   │                                # NewsCarousel, SkeletonLoader, NotificationBell,
+│   │                                # ReportCardPDF, TimetableGrid, CurriculumView,
+│   │                                # RichTextEditor, DashboardCalendar, NotebookLoader,
+│   │                                # LogoutOverlay, MotivationalTicker, SubjectCard
 │   ├── lib/
 │   │   ├── supabase/               # client.ts (browser), server.ts (SSR)
 │   │   ├── utils.ts
-│   │   └── notifications.ts        # Helper para crear notificaciones batch
+│   │   ├── notifications.ts        # Helper para crear notificaciones batch
+│   │   └── uploads.ts              # Constantes y helpers para uploads (extensiones,
+│   │                                # tamaño máximo 20MB, buildStoragePath con sufijo único)
 │   ├── hooks/                      # useAuth, useRealtimeSubscription, useRealtimeRefresh
 │   ├── types/database.ts           # Tipos generados desde schema Supabase
 │   └── middleware.ts               # Auth + role-based routing
 ├── supabase/
-│   ├── schema.sql                  # 17 tablas + triggers + RLS
+│   ├── schema.sql                  # Tablas + triggers + RLS
 │   └── seed.sql
+├── .vercel/project.json            # projectId + orgId para Vercel CLI
 ├── next.config.mjs
 ├── tailwind.config.ts
+├── vercel.json                     # buildCommand: next build, framework: nextjs
 └── package.json
 ```
 
@@ -106,7 +113,8 @@ npm run dev      # http://localhost:3001
 | `teacher_assignments` | Profesor → salón + materia + período |
 | `schedules` | Horario por salón/materia/profesor |
 | `tasks` | Tareas publicadas por profesores (draft/published/closed) |
-| `submissions` | Entregas de alumnos (archivos + puntaje) |
+| `submissions` | Entregas de alumnos (1 fila por entrega, varios archivos en `submission_files`) |
+| `submission_files` | Archivos asociados a cada entrega (N filas por submission, cascade delete) |
 | `grades` | Calificaciones por alumno/materia/período |
 | `report_cards` | Boletines finales |
 | `news` | Noticias con imagen |
@@ -141,17 +149,27 @@ Tablas con `REPLICA IDENTITY FULL` y publicación `supabase_realtime`:
 - **Shimmer loading inline** en páginas (sin `loading.tsx` de route group)
 - **NewsCarousel** en dashboards con imágenes y auto-rotación
 - **Grading config**: tabla editable con colgroup, inputs de pesos inline, resaltado de filas sucias, guardado por salón+materia
-- **Teacher students page**: tabla con promedio (barra de progreso), estado de entregas (badges), cache en localStorage
+- **Teacher students page**: tabla con promedio (barra de progreso), estado de entregas (badges), avatares circulares, cache en localStorage
+- **Teacher student profile**: header con avatar + sección de notas por categoría + exoneraciones editables
+- **Exoneraciones (exemptions)**: modal con creación y edición, período escolar seleccionable, `upsert` por (student, classroom_subject, period, category) para evitar 409
 - **Assignment form**: placeholders, validación client-side, auto-creación de classroom_subjects
 - **Delete cascade**: 30+ FK actualizadas, trigger `on_user_deleted`, DELETE vía API con service_role en `auth.users`
 - **Login con animación de libro** profesional
+- **Múltiples archivos por entrega**: tabla `submission_files` con 1 fila por archivo, paths únicos con timestamp + random
+- **Subida de archivos**: helper `src/lib/uploads.ts` con 26 extensiones aceptadas, límite 20MB, sanitización de acentos y espacios en nombres
+- **Student grades**: rediseño a lista de tareas (título, categoría, estado de entrega, puntaje) en vez de breakdown ficticio por categoría
+- **Teacher dashboard "Entregas Pendientes"**: muestra `expectedDeliveries - receivedDeliveries` con detalle "X de Y entregadas"
 
 ## Decisiones de Arquitectura
 
 - `subject_grading_config.teacher_id` referencia `public.users(id)`, no `teachers(id)` — el save/load usan `user.id`
 - `teacher_assignments.teacher_id` referencia `public.teachers(id)` — queries de asignaciones usan `teachers.id`
+- `exemptions.student_id` referencia `public.users(id)` (NO `students(id)`) — el load resuelve `students.user_id` antes de insertar
 - Eliminado `school_period_id` del grading config — aplica globalmente por salón+materia
 - Participación (bonus) = manual 1:1, suma directa al promedio final
+- `submissions` es 1 fila por (alumno, tarea) y `submission_files` es N filas por submission, con `ON DELETE CASCADE` para limpieza
+- Paths en Storage usan `${Date.now()}-${random}-${filename}` (sin `upsert: true`) para evitar colisiones en archivos con mismo nombre
+- Modo oscuro deshabilitado (infraestructura conservada: `ThemeProvider` con `defaultTheme="light"`, `enableSystem={false}`), `ThemeToggle` removido del header
 - ESLint `no-unused-vars` como "warn" + `ignoreDuringBuilds: true`
 - `vercel.json` con `buildCommand: next build`, `framework: nextjs`
 - Storage buckets: `curriculum-files`, `edutask-submissions`, `edutask-tasks`, `avatars`
@@ -161,8 +179,18 @@ Tablas con `REPLICA IDENTITY FULL` y publicación `supabase_realtime`:
 ```bash
 npm run build    # Build producción
 npm run lint     # Linting
-npx vercel --prod # Deploy manual a Vercel
+npx vercel --prod # Deploy manual a Vercel (con auth.json en ~/.vercel/)
 ```
 
-- Vercel project: `dilson-zm-s-projects/edutask`
+- Vercel project: `dilson-zm-s-projects/edutask` (alias: `edutask-one.vercel.app`)
 - GitHub: https://github.com/DilsonZM/eductask
+
+### Deploy Hook (redeploy manual sin esperar webhook)
+
+Si el auto-deploy de Vercel desde GitHub se cae, podés disparar un deploy con un solo curl:
+
+```bash
+curl -X POST https://api.vercel.com/v1/integrations/deploy/prj_Tt6l56BuLI37RUMzrq4fluhunhRB/W70jviuVv2
+```
+
+Este hook (`manual-trigger`, ref `main`) está configurado en el proyecto y responde con `{ job: { id, state: PENDING } }` confirmando que el deploy se encoló.
