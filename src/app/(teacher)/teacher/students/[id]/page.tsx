@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearchParams } from "next/navigation";
@@ -12,9 +12,10 @@ import { ArrowLeft, Star, CheckCircle, AlertTriangle, FileText, Download, Edit3,
 import Link from "next/link";
 
 interface TaskRow { id: string; title: string; category: string; dueDate: string; score: number | null; }
-interface ExemptionRow { id: string; category: string; auto_score: number; reason: string | null; }
+interface ExemptionRow { id: string; category: string; auto_score: number; reason: string | null; school_period_id: string | null; }
 interface CategoryData { tasks: TaskRow[]; exemption: ExemptionRow | null; avg: number | null; }
-interface SubHistory { taskTitle: string; category: string; fileName: string; filePath: string; submittedAt: string | null; comments: string | null; score: number | null; dueDate: string; }
+interface SubFile { id: string; file_name: string; file_path: string; }
+interface SubHistory { id: string; taskTitle: string; category: string; files: SubFile[]; submittedAt: string | null; comments: string | null; score: number | null; dueDate: string; }
 
 const CATEGORY_LABELS: Record<string, string> = {
   taller: "Taller", trabajo: "Trabajo", quiz: "Quiz", participacion: "Participación", examen_final: "Examen Final",
@@ -38,11 +39,16 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
   const [exemptions, setExemptions] = useState<ExemptionRow[]>([]);
   const [weightedAvg, setWeightedAvg] = useState<number | null>(null);
   const [subsHistory, setSubsHistory] = useState<SubHistory[]>([]);
+  const [studentUserId, setStudentUserId] = useState<string>("");
+  const [studentAvatar, setStudentAvatar] = useState<string | null>(null);
 
   const [exemptModal, setExemptModal] = useState(false);
   const [exemptCategory, setExemptCategory] = useState("");
   const [exemptScore, setExemptScore] = useState(0);
   const [exemptReason, setExemptReason] = useState("");
+  const [exemptPeriod, setExemptPeriod] = useState("");
+  const [editingExemptId, setEditingExemptId] = useState<string | null>(null);
+  const [periods, setPeriods] = useState<{ id: string; name: string }[]>([]);
   const [savingExempt, setSavingExempt] = useState(false);
   const [editingScore, setEditingScore] = useState<{ submissionId: string; value: string } | null>(null);
   const [savingScore, setSavingScore] = useState(false);
@@ -52,6 +58,18 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
     if (!csId) return;
     setLoading(true);
     try {
+      const { data: stu } = await supabaseRef.current.from("students")
+        .select("user_id").eq("id", studentId).maybeSingle();
+      setStudentUserId(stu?.user_id || "");
+
+      if (stu?.user_id) {
+        const { data: userData } = await supabaseRef.current.from("users")
+          .select("avatar").eq("id", stu.user_id).maybeSingle();
+        setStudentAvatar(userData?.avatar || null);
+      } else {
+        setStudentAvatar(null);
+      }
+
       const { data: configData } = await supabaseRef.current.from("subject_grading_config")
         .select("*").eq("classroom_subject_id", csId).order("created_at", { ascending: false }).limit(1).single();
 
@@ -70,11 +88,17 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
 
       const taskIds = (tasks || []).map((t) => t.id);
       const { data: subs } = taskIds.length > 0 ? await supabaseRef.current.from("submissions")
-        .select("id, task_id, student_id, score, file_path, file_name, submitted_at, comments").eq("student_id", studentId).in("task_id", taskIds) : { data: [] };
+        .select("id, task_id, student_id, score, submitted_at, comments, submission_files(*)").eq("student_id", studentId).in("task_id", taskIds) : { data: [] };
 
-      const { data: exemptData } = await supabaseRef.current.from("exemptions")
-        .select("*").eq("student_id", studentId).eq("classroom_subject_id", csId);
+      const { data: exemptData } = stu?.user_id
+        ? await supabaseRef.current.from("exemptions")
+            .select("*").eq("student_id", stu.user_id).eq("classroom_subject_id", csId)
+        : { data: [] };
       setExemptions((exemptData || []) as ExemptionRow[]);
+
+      const { data: periodData } = await supabaseRef.current.from("school_periods")
+        .select("id, name").order("order");
+      setPeriods(periodData || []);
 
       const cats: Record<string, CategoryData> = {};
       const exemptMap = new Map<string, ExemptionRow>();
@@ -98,9 +122,10 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
       (subs || []).forEach((s) => {
         const t = taskMap.get(s.task_id);
         history.push({
+          id: s.id,
           taskTitle: t?.title || "Tarea",
           category: t?.category || "",
-          fileName: s.file_name || "", filePath: s.file_path || "",
+          files: ((s as Record<string, unknown>).submission_files as SubFile[]) || [],
           submittedAt: s.submitted_at, comments: s.comments || null,
           score: s.score, dueDate: t?.due_date || "",
         });
@@ -130,17 +155,45 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleExempt = async () => {
-    if (!exemptCategory) return;
+    if (!exemptCategory || !exemptPeriod) {
+      toast.error("Selecciona categoría y período");
+      return;
+    }
     setSavingExempt(true);
     try {
-      const { data: newEx } = await supabaseRef.current.from("exemptions").insert({
-        student_id: studentId, classroom_subject_id: csId,
-        category: exemptCategory, auto_score: exemptScore,
-        reason: exemptReason || null, granted_by: user?.id,
-      }).select("*").single();
-      if (newEx) { toast.success("Exoneración registrada"); setExemptModal(false); loadData(); }
-    } catch (e: any) { toast.error(e?.message || "Error"); }
-    finally { setSavingExempt(false); }
+      const { error } = await supabaseRef.current.from("exemptions").upsert({
+        student_id: studentUserId,
+        classroom_subject_id: csId,
+        school_period_id: exemptPeriod,
+        category: exemptCategory,
+        auto_score: exemptScore,
+        reason: exemptReason || null,
+        granted_by: user?.id,
+      }, { onConflict: "student_id,classroom_subject_id,school_period_id,category" });
+      if (error) throw error;
+      toast.success(editingExemptId ? "Exoneración actualizada" : "Exoneración registrada");
+      setExemptModal(false);
+      setEditingExemptId(null);
+      loadData();
+    } catch (e: any) {
+      toast.error(e?.message || "Error");
+    } finally {
+      setSavingExempt(false);
+    }
+  };
+
+  const openEditExempt = (ex: ExemptionRow) => {
+    setEditingExemptId(ex.id);
+    setExemptCategory(ex.category);
+    setExemptScore(ex.auto_score);
+    setExemptReason(ex.reason || "");
+    setExemptPeriod(ex.school_period_id || "");
+    setExemptModal(true);
+  };
+
+  const closeExemptModal = () => {
+    setExemptModal(false);
+    setEditingExemptId(null);
   };
 
   const handleSaveScore = async (submissionId: string) => {
@@ -172,9 +225,18 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
         <ArrowLeft className="w-4 h-4" /> Volver a Mis Estudiantes
       </Link>
 
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-serif">{studentName}</h1>
-        <p className="text-sm text-slate-500">{classroomName} — {subjectName}</p>
+      <div className="flex items-center gap-4">
+        <div className="w-16 h-16 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center font-semibold text-lg overflow-hidden shrink-0">
+          {studentAvatar ? (
+            <img src={studentAvatar} alt={studentName} className="w-full h-full object-cover" />
+          ) : (
+            studentName.charAt(0).toUpperCase()
+          )}
+        </div>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-serif">{studentName}</h1>
+          <p className="text-sm text-slate-500">{classroomName} — {subjectName}</p>
+        </div>
       </div>
 
       {loading ? (<div className="text-center py-8 text-slate-400">Cargando...</div>) : (
@@ -198,7 +260,7 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
                 ) : (
                   <span className="text-sm text-slate-400">Sin promedio calculado</span>
                 )}
-                <Button onClick={() => { setExemptModal(true); setExemptCategory(""); setExemptScore(config?.maxScore || 10); setExemptReason(""); }}
+                <Button onClick={() => { setEditingExemptId(null); setExemptModal(true); setExemptCategory(""); setExemptScore(config?.maxScore || 10); setExemptReason(""); setExemptPeriod(""); }}
                   variant="outline"><Star className="w-4 h-4" /> Exonerar categoría</Button>
               </div>
             </div>
@@ -226,9 +288,9 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
                     const ex = d.exemption;
 
                     return (
-                      <>
+                      <Fragment key={cat}>
                         {d.tasks.length === 0 && !ex ? (
-                          <tr key={`${cat}-empty`}>
+                          <tr>
                             <td className="px-4 py-3 text-sm text-slate-500">
                               <span className="font-medium">{CATEGORY_LABELS[cat]}</span>
                               <span className="text-xs ml-1">({w}%)</span>
@@ -237,14 +299,14 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
                           </tr>
                         ) : null}
                         {ex && (
-                          <tr key={`${cat}-exempt`} className="bg-purple-50/30">
+                          <tr className="bg-purple-50/30">
                             <td className="px-4 py-3 text-sm font-medium text-purple-700">
                               {CATEGORY_LABELS[cat]} <span className="text-xs">({w}%)</span>
                             </td>
                             <td className="px-4 py-3"><span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><Star className="w-3 h-3" /> EXONERADO</span></td>
                             <td className="px-4 py-3 text-center text-sm font-bold text-purple-700">{ex.auto_score}</td>
                             <td className="px-4 py-3 text-right">
-                              <button onClick={() => { setEditingScore({ submissionId: ex.id, value: String(ex.auto_score) }); }} className="text-xs text-slate-400 hover:text-primary-600 mr-2"><Edit3 className="w-3.5 h-3.5 inline" /> Editar nota</button>
+                              <button onClick={() => openEditExempt(ex)} className="text-xs text-slate-400 hover:text-primary-600 mr-2"><Edit3 className="w-3.5 h-3.5 inline" /> Editar</button>
                               <button onClick={() => setDeleteExemptId(ex.id)} className="text-xs text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5 inline" /> Quitar</button>
                             </td>
                           </tr>
@@ -270,7 +332,7 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
                             <td className="px-4 py-3 text-right">{/* placeholder for actions */}</td>
                           </tr>
                         ))}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -310,12 +372,16 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
                           ) : <span className="text-slate-400">—</span>}
                         </td>
                         <td className="px-4 py-2.5">
-                          {h.filePath ? (
-                            <a href={supabaseRef.current.storage.from("edutask-submissions").getPublicUrl(h.filePath).data.publicUrl}
-                              target="_blank" rel="noopener noreferrer"
-                              className="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1">
-                              <FileText className="w-3 h-3" /> {h.fileName}
-                            </a>
+                          {h.files.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {h.files.map((f) => (
+                                <a key={f.id} href={supabaseRef.current.storage.from("edutask-submissions").getPublicUrl(f.file_path).data.publicUrl}
+                                  target="_blank" rel="noopener noreferrer"
+                                  className="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1">
+                                  <FileText className="w-3 h-3" /> {f.file_name}
+                                </a>
+                              ))}
+                            </div>
                           ) : <span className="text-xs text-slate-400">—</span>}
                         </td>
                         <td className="px-4 py-2.5 text-center text-sm font-medium">
@@ -334,17 +400,27 @@ export default function StudentProfilePage({ params }: { params: { id: string } 
         </>
       )}
 
-      <Modal isOpen={exemptModal} onClose={() => setExemptModal(false)} title={`Exonerar categoría — ${studentName}`}
-        footer={<><Button variant="outline" onClick={() => setExemptModal(false)}>Cancelar</Button><Button onClick={handleExempt} isLoading={savingExempt} disabled={!exemptCategory}><Star className="w-4 h-4" /> Confirmar exoneración</Button></>}>
+      <Modal isOpen={exemptModal} onClose={closeExemptModal} title={editingExemptId ? `Editar exoneración — ${studentName}` : `Exonerar categoría — ${studentName}`}
+        footer={<><Button variant="outline" onClick={closeExemptModal}>Cancelar</Button><Button onClick={handleExempt} isLoading={savingExempt} disabled={!exemptCategory || !exemptPeriod}><Star className="w-4 h-4" /> {editingExemptId ? "Guardar cambios" : "Confirmar exoneración"}</Button></>}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
             <div className="flex flex-wrap gap-2">
-              {CAT_ORDER.filter((c) => !categories[c]?.exemption).map((c) => (
+              {CAT_ORDER.filter((c) => editingExemptId ? c === exemptCategory || !categories[c]?.exemption : !categories[c]?.exemption).map((c) => (
                 <button key={c} onClick={() => setExemptCategory(exemptCategory === c ? "" : c)}
                   className={cn("px-3 py-1.5 rounded-lg text-sm", exemptCategory === c ? "bg-purple-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>{CATEGORY_LABELS[c]}</button>
               ))}
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Período</label>
+            <select value={exemptPeriod} onChange={(e) => setExemptPeriod(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+              <option value="">Seleccionar período...</option>
+              {periods.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nota automática (máx {config?.maxScore || 10})</label>

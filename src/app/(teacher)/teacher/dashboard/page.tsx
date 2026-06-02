@@ -23,6 +23,10 @@ export default function TeacherDashboard() {
     pendingSubmissions: 0,
     totalStudents: 0,
   });
+  const [pendingDetail, setPendingDetail] = useState({
+    submitted: 0,
+    expected: 0,
+  });
   const [recentTasks, setRecentTasks] = useState<
     { id: string; title: string; due_date: string; status: string }[]
   >([]);
@@ -73,17 +77,6 @@ export default function TeacherDashboard() {
           supabaseRef.current.from("news").select("id, title, published_at").eq("is_published", true).order("published_at", { ascending: false }).limit(8),
         ]);
 
-      let pendingSubmissionsCount = 0;
-      const taskIds = (taskIdsRes.data || []).map((t) => t.id);
-      if (taskIds.length > 0) {
-        const { count } = await supabaseRef.current
-          .from("submissions")
-          .select("id", { count: "exact", head: true })
-          .in("task_id", taskIds)
-          .is("score", null);
-        pendingSubmissionsCount = count || 0;
-      }
-
       const classroomIds = Array.from(
         new Set((assignmentsRes.data || []).map((a) => a.classroom_id).filter(Boolean))
       );
@@ -97,11 +90,70 @@ export default function TeacherDashboard() {
         totalStudents = count || 0;
       }
 
+      let pendingSubmissionsCount = 0;
+      let expectedDeliveries = 0;
+      let receivedDeliveries = 0;
+      const taskIds = (taskIdsRes.data || []).map((t) => t.id);
+      if (taskIds.length > 0) {
+        const { data: tasksWithCs } = await supabaseRef.current
+          .from("tasks")
+          .select("id, classroom_subject_id, classroom_subjects(classroom_id)")
+          .in("id", taskIds);
+
+        const taskClassroomMap = new Map<string, string>();
+        const taskClassrooms = Array.from(
+          new Set(
+            (tasksWithCs || [])
+              .map((t) => {
+                const cs = t.classroom_subjects as unknown as { classroom_id: string } | { classroom_id: string }[] | null;
+                if (!cs) return null;
+                const item = Array.isArray(cs) ? cs[0] : cs;
+                return item?.classroom_id ?? null;
+              })
+              .filter((c): c is string => Boolean(c))
+          )
+        );
+
+        let studentsByClassroom: Record<string, number> = {};
+        if (taskClassrooms.length > 0) {
+          const { data: classroomStudents } = await supabaseRef.current
+            .from("students")
+            .select("id, classroom_id")
+            .in("classroom_id", taskClassrooms)
+            .eq("status", "active");
+          for (const s of classroomStudents || []) {
+            studentsByClassroom[s.classroom_id] =
+              (studentsByClassroom[s.classroom_id] || 0) + 1;
+          }
+        }
+
+        for (const t of tasksWithCs || []) {
+          const cs = t.classroom_subjects as unknown as { classroom_id: string } | { classroom_id: string }[] | null;
+          if (!cs) continue;
+          const classroomId = (Array.isArray(cs) ? cs[0]?.classroom_id : cs?.classroom_id) ?? null;
+          if (!classroomId) continue;
+          taskClassroomMap.set(t.id, classroomId);
+          expectedDeliveries += studentsByClassroom[classroomId] || 0;
+        }
+
+        const { count: submissionsCount } = await supabaseRef.current
+          .from("submissions")
+          .select("id", { count: "exact", head: true })
+          .in("task_id", taskIds);
+        receivedDeliveries = submissionsCount || 0;
+
+        pendingSubmissionsCount = Math.max(0, expectedDeliveries - receivedDeliveries);
+      }
+
       setStats({
         assignedSubjects: assignmentsRes.count || 0,
         publishedTasks: publishedTasksRes.count || 0,
         pendingSubmissions: pendingSubmissionsCount,
         totalStudents,
+      });
+      setPendingDetail({
+        submitted: receivedDeliveries,
+        expected: expectedDeliveries,
       });
       if (tasksWithDateRes.data) setRecentTasks(tasksWithDateRes.data);
       if (eventsRes.data) setEvents(eventsRes.data);
@@ -206,6 +258,11 @@ export default function TeacherDashboard() {
         <StatsCard
           title="Entregas Pendientes"
           value={stats.pendingSubmissions}
+          description={
+            pendingDetail.expected > 0
+              ? `${pendingDetail.submitted} de ${pendingDetail.expected} entregadas`
+              : undefined
+          }
           icon={<CheckSquare className="w-5 h-5" />}
         />
         <StatsCard

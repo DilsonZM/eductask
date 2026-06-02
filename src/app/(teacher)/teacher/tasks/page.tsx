@@ -11,14 +11,25 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils";
+import { ACCEPTED_FILE_EXTENSIONS, MAX_FILE_SIZE, MAX_FILE_SIZE_LABEL, isAcceptedFile, formatFileSize, buildStoragePath } from "@/lib/uploads";
 import type { Tables } from "@/types/database";
-import toast from "react-hot-toast";
 import { createNotifications } from "@/lib/notifications";
-import { X, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { X, ExternalLink } from "lucide-react";
 
 type Task = Tables<"tasks">;
 type TaskAttachment = Tables<"task_attachments">;
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface FileEntry {
+  file: File;
+  id: string;
+}
 
 interface TaskRow {
   id: string;
@@ -31,27 +42,12 @@ interface TaskRow {
   max_score: number;
   allow_late: boolean;
   status: string;
+  category: string | null;
   subjectName: string;
   classroomName: string;
   submissionCount: number;
   studentCount: number;
   attachments: TaskAttachment[];
-}
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
-
-interface FileEntry {
-  file: File;
-  id: string;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getStatusBadge(status: string) {
@@ -67,18 +63,6 @@ function getStatusBadge(status: string) {
     </span>
   );
 }
-
-const ALLOWED_FILE_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-];
 
 export default function TasksPage() {
   const { user } = useAuth();
@@ -321,6 +305,7 @@ export default function TasksPage() {
           max_score: r.max_score as number,
           allow_late: r.allow_late as boolean,
           status: r.status as string,
+          category: (r as Record<string, unknown>).category as string | null,
           subjectName: subjects?.name || "—",
           classroomName: classrooms?.name || "—",
           submissionCount: subCountByTask.get(r.id as string) || 0,
@@ -430,12 +415,12 @@ export default function TasksPage() {
     const newEntries: FileEntry[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      if (!isAcceptedFile(file)) {
         toast.error(`Tipo no permitido: ${file.name}`);
         continue;
       }
-      if (file.size > 50 * 1024 * 1024) {
-        toast.error(`Demasiado grande (máx 50MB): ${file.name}`);
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`Demasiado grande (máx ${MAX_FILE_SIZE_LABEL}): ${file.name}`);
         continue;
       }
       newEntries.push({ file, id: `${Date.now()}-${i}-${file.name}` });
@@ -447,12 +432,12 @@ export default function TasksPage() {
   const uploadFiles = async (taskId: string): Promise<TaskAttachment[]> => {
     const results: TaskAttachment[] = [];
     for (const entry of attachments) {
-      const filePath = `tasks/${taskId}/${entry.file.name}`;
+      const filePath = buildStoragePath(taskId, entry.file.name);
       const { error: uploadError } = await supabaseRef.current.storage
         .from("edutask-tasks")
-        .upload(filePath, entry.file, { upsert: true });
+        .upload(filePath, entry.file);
       if (uploadError) {
-        toast.error(`Error al subir ${entry.file.name}`);
+        toast.error(`Error al subir ${entry.file.name}: ${uploadError.message}`);
         continue;
       }
       const { data: insertData, error: insertError } = await supabaseRef.current
@@ -467,7 +452,7 @@ export default function TasksPage() {
         .select("*")
         .single();
       if (insertError) {
-        toast.error(`Error al guardar ${entry.file.name}`);
+        toast.error(`Error al guardar ${entry.file.name}: ${insertError.message}`);
         continue;
       }
       if (insertData) results.push(insertData);
@@ -701,7 +686,9 @@ export default function TasksPage() {
           <>
             <Button variant="outline" onClick={() => { setModalOpen(false); resetForm(); }}>Cancelar</Button>
             <Button variant="outline" onClick={() => handleSubmit("draft")} isLoading={isSubmitting}>Guardar Borrador</Button>
-            <Button onClick={() => handleSubmit("published")} isLoading={isSubmitting}>{selectedTask ? "Guardar" : "Publicar"}</Button>
+            <Button onClick={() => handleSubmit("published")} isLoading={isSubmitting}>
+              {selectedTask?.status === "closed" ? "Reabrir" : selectedTask ? "Guardar" : "Publicar"}
+            </Button>
           </>
         }
       >
@@ -730,19 +717,6 @@ export default function TasksPage() {
               value={formData.school_period_id}
               onChange={(e) => setFormData({ ...formData, school_period_id: e.target.value })}
               options={[{ value: "", label: "Sin período" }, ...periods]}
-            />
-            <Select
-              label="Categoría"
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              options={[
-                { value: "", label: "Seleccionar..." },
-                { value: "taller", label: "Taller" },
-                { value: "trabajo", label: "Trabajo" },
-                { value: "quiz", label: "Quiz" },
-                { value: "participacion", label: "Participación" },
-                { value: "examen_final", label: "Examen Final" },
-              ]}
             />
             <Select
               label="Categoría"
@@ -787,8 +761,8 @@ export default function TasksPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Archivos adjuntos</label>
-            <input type="file" multiple onChange={handleFileSelect} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200" />
-            <p className="text-xs text-slate-400 mt-1">PDF, Word, Excel, imágenes</p>
+            <input type="file" multiple accept={ACCEPTED_FILE_EXTENSIONS.join(",")} onChange={handleFileSelect} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200" />
+            <p className="text-xs text-slate-400 mt-1">PDF, Word, Excel, PowerPoint, imágenes, zip. Máx {MAX_FILE_SIZE_LABEL} c/u</p>
             {existingAttachments.length > 0 && (
               <div className="mt-3 space-y-1">
                 {existingAttachments.map((att) => (

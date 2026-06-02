@@ -12,6 +12,7 @@ import { Users, CheckCircle, AlertTriangle, Star, ChevronRight } from "lucide-re
 interface StudentRow {
   studentId: string;
   name: string;
+  avatar: string | null;
   classroomName: string;
   subjectName: string;
   subjectId: string;
@@ -158,9 +159,19 @@ export default function StudentsPage() {
       const maxScore = (config?.max_score as number) || 10;
 
       const { data: studentList } = await supabaseRef.current.from("students")
-        .select("id, first_name, last_name").eq("classroom_id", classroomFilter).eq("status", "active").order("last_name");
+        .select("id, user_id, first_name, last_name").eq("classroom_id", classroomFilter).eq("status", "active").order("last_name");
 
       if (!studentList?.length) { setStudents([]); return; }
+
+      const userIds = (studentList || [])
+        .map((s) => s.user_id)
+        .filter((id): id is string => Boolean(id));
+      let avatarMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: userData } = await supabaseRef.current.from("users")
+          .select("id, avatar").in("id", userIds);
+        avatarMap = new Map((userData || []).map((u) => [u.id, u.avatar || ""]));
+      }
 
       const { data: allTasks } = await supabaseRef.current.from("tasks")
         .select("id, category").eq("classroom_subject_id", csId).in("status", ["published", "closed"]);
@@ -199,6 +210,7 @@ export default function StudentsPage() {
         return {
           studentId: st.id,
           name: `${st.first_name} ${st.last_name}`,
+          avatar: st.user_id ? avatarMap.get(st.user_id) || null : null,
           classroomName: classrooms.find((c) => c.id === classroomFilter)?.name || "",
           subjectName: subjects.find((s) => s.id === subjectFilter)?.name || "",
           subjectId: subjectFilter,
@@ -282,7 +294,16 @@ export default function StudentsPage() {
                   return (
                     <tr key={st.studentId} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-3.5">
-                        <p className="text-sm font-semibold text-slate-900">{st.name}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center font-semibold text-xs overflow-hidden shrink-0">
+                            {st.avatar ? (
+                              <img src={st.avatar} alt={st.name} className="w-full h-full object-cover" />
+                            ) : (
+                              st.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-slate-900">{st.name}</p>
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
                         {st.average !== null ? (

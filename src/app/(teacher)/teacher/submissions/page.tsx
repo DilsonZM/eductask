@@ -25,12 +25,17 @@ type TaskOption = {
   school_period_id: string;
 };
 
+interface SubmissionFile {
+  id: string;
+  file_path: string;
+  file_name: string;
+}
+
 interface SubmissionRow {
   id: string;
   student_id: string;
   student_name: string;
-  file_path: string;
-  file_name: string;
+  files: SubmissionFile[];
   submitted_at: string | null;
   score: number | null;
   teacher_comment: string | null;
@@ -119,7 +124,7 @@ export default function SubmissionsPage() {
       try {
         const { data: subsData } = await supabaseRef.current
           .from("submissions")
-          .select("*, students!inner(first_name, last_name)")
+          .select("*, students!inner(first_name, last_name), submission_files(*)")
           .eq("task_id", task.id);
 
         const submitters = new Set<string>();
@@ -136,8 +141,7 @@ export default function SubmissionsPage() {
               id: s.id as string,
               student_id: s.student_id as string,
               student_name: `${student?.first_name || ""} ${student?.last_name || ""}`.trim(),
-              file_path: s.file_path as string,
-              file_name: s.file_name as string,
+              files: ((s as Record<string, unknown>).submission_files as SubmissionFile[]) || [],
               submitted_at: s.submitted_at as string | null,
               score: (s as Record<string, number | null>).score ?? null,
               teacher_comment: (s as Record<string, string | null>).teacher_comment ?? null,
@@ -404,18 +408,23 @@ export default function SubmissionsPage() {
                         {sub.submitted_at ? formatDateTime(sub.submitted_at) : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        {sub.file_path ? (
-                          <a
-                            href={getDownloadUrl(sub.file_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 text-sm text-slate-700 hover:text-primary-700"
-                          >
-                            <span className="max-w-[140px] truncate">{sub.file_name}</span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-primary-50 text-primary-700 rounded-full hover:bg-primary-100 transition-colors">
-                              Ver <ExternalLink className="w-3 h-3" />
-                            </span>
-                          </a>
+                        {sub.files.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {sub.files.map((f) => (
+                              <a
+                                key={f.id}
+                                href={getDownloadUrl(f.file_path)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 text-sm text-slate-700 hover:text-primary-700"
+                              >
+                                <span className="max-w-[140px] truncate">{f.file_name}</span>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-primary-50 text-primary-700 rounded-full hover:bg-primary-100 transition-colors">
+                                  Ver <ExternalLink className="w-3 h-3" />
+                                </span>
+                              </a>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-sm text-slate-400">—</span>
                         )}

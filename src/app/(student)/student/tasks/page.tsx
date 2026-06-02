@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -9,6 +9,7 @@ import { ShimmerGrid } from "@/components/common/SkeletonLoader";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
+import { ACCEPTED_FILE_EXTENSIONS, MAX_FILE_SIZE, MAX_FILE_SIZE_LABEL, isAcceptedFile, buildStoragePath } from "@/lib/uploads";
 import {
   Upload,
   Download,
@@ -54,16 +55,23 @@ interface TaskData {
   subjectCode: string;
 }
 
+interface SubmissionFile {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number | null;
+  uploaded_at: string;
+}
+
 interface SubmissionData {
   id: string;
   task_id: string;
   student_id: string;
-  file_path: string;
-  file_name: string;
   submitted_at: string;
   comments: string | null;
   score: number | null;
   teacher_comment: string | null;
+  files?: SubmissionFile[];
 }
 
 interface AttachmentData {
@@ -94,10 +102,7 @@ const SUBJECT_COLORS = [
   { bg: "bg-lime-100", text: "text-lime-700" },
 ];
 
-const ACCEPTED_FILE_TYPES =
-  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp,.txt";
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_FILES = 3;
+const ACCEPTED_FILE_TYPES = ACCEPTED_FILE_EXTENSIONS.join(",");
 
 function getSubjectColor(name: string) {
   let hash = 0;
@@ -215,7 +220,7 @@ export default function TasksPage() {
 
       const { data: existingSubs } = await supabase
         .from("submissions")
-        .select("*")
+        .select("*, submission_files(*)")
         .eq("student_id", student.id);
 
       const subsArr = (existingSubs || []) as SubmissionData[];
@@ -321,21 +326,18 @@ export default function TasksPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     const validFiles = selectedFiles.filter((f) => {
+      if (!isAcceptedFile(f)) {
+        toast.error(`Tipo no permitido: ${f.name}`);
+        return false;
+      }
       if (f.size > MAX_FILE_SIZE) {
-        toast.error(`El archivo "${f.name}" supera los 10MB`);
+        toast.error(`"${f.name}" supera ${MAX_FILE_SIZE_LABEL}`);
         return false;
       }
       return true;
     });
 
-    setUploadFiles((prev) => {
-      const combined = [...prev, ...validFiles];
-      if (combined.length > MAX_FILES) {
-        toast.error(`Máximo ${MAX_FILES} archivos por entrega`);
-        return combined.slice(0, MAX_FILES);
-      }
-      return combined;
-    });
+    setUploadFiles((prev) => [...prev, ...validFiles]);
 
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -356,36 +358,49 @@ export default function TasksPage() {
 
     setUploading(true);
 
-    const timestamp = Date.now();
-
     try {
-      const existingSubs = submissions[selectedTask.id] || [];
-      const ungradedIds = existingSubs
-        .filter((s) => s.score == null)
-        .map((s) => s.id);
-
-      if (ungradedIds.length > 0) {
-        await supabase.from("submissions").delete().in("id", ungradedIds);
+      const hasGraded = (submissions[selectedTask.id] || []).some(
+        (s) => s.score != null
+      );
+      if (hasGraded) {
+        toast.error("La tarea ya está calificada, no se puede modificar");
+        setUploading(false);
+        return;
       }
+
+      const { data: sub, error: subError } = await supabase
+        .from("submissions")
+        .insert({
+          task_id: selectedTask.id,
+          student_id: studentId,
+          comments: comments.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (subError) throw subError;
 
       for (let i = 0; i < uploadFiles.length; i++) {
         const file = uploadFiles[i];
-        const fileName = `${timestamp}_${i}_${file.name}`;
-        const filePath = `submissions/${selectedTask.id}/${studentId}/${fileName}`;
+        const filePath = buildStoragePath(
+          `${selectedTask.id}/${studentId}`,
+          file.name
+        );
 
         const { error: uploadError } = await supabase.storage
           .from("edutask-submissions")
-          .upload(filePath, file);
+          .upload(filePath, file, { upsert: true });
 
         if (uploadError) throw uploadError;
 
-        await supabase.from("submissions").insert({
-          task_id: selectedTask.id,
-          student_id: studentId,
-          file_path: filePath,
-          file_name: file.name,
-          comments: comments.trim() || null,
-        });
+        const { error: fileError } = await supabase
+          .from("submission_files")
+          .insert({
+            submission_id: sub.id,
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+          });
+        if (fileError) throw fileError;
       }
 
       toast.success("Tarea entregada correctamente");
@@ -419,9 +434,40 @@ export default function TasksPage() {
     return data.publicUrl;
   };
 
+  const handleDeleteSubmission = async (sub: SubmissionData) => {
+    if (sub.score != null) {
+      toast.error("No se puede eliminar una entrega ya calificada");
+      return;
+    }
+    const supabase = supabaseRef.current;
+    try {
+      const { data: files } = await supabase
+        .from("submission_files")
+        .select("file_path")
+        .eq("submission_id", sub.id);
+      if (files && files.length > 0) {
+        await supabase.storage
+          .from("edutask-submissions")
+          .remove(files.map((f) => f.file_path));
+      }
+      const { error } = await supabase.from("submissions").delete().eq("id", sub.id);
+      if (error) throw error;
+      toast.success("Entrega eliminada");
+      await fetchData();
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo eliminar la entrega");
+    }
+  };
+
   const taskSubmissions = selectedTask ? submissions[selectedTask.id] || [] : [];
   const taskAttachments = selectedTask ? attachments[selectedTask.id] || [] : [];
   const taskOverdue = selectedTask ? isOverdue(selectedTask.due_date) : false;
+  const isGraded = useMemo(
+    () => taskSubmissions.some((s) => s.score != null),
+    [taskSubmissions]
+  );
+
   const canSubmit =
     selectedTask &&
     (selectedTask.status !== "closed" || selectedTask.allow_late);
@@ -675,34 +721,63 @@ export default function TasksPage() {
 
               {taskSubmissions.length > 0 ? (
                 <div className="space-y-3">
-                  {taskSubmissions.map((sub) => (
-                    <div
-                      key={sub.id}
-                      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
-                    >
-                      <a
-                        href={
-                          supabaseRef.current.storage
-                            .from("edutask-submissions")
-                            .getPublicUrl(sub.file_path).data.publicUrl
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 flex-1 truncate"
+                  {taskSubmissions.map((sub) => {
+                    const isGraded = sub.score != null;
+                    return (
+                      <div
+                        key={sub.id}
+                        className={`p-3 rounded-lg border ${
+                          isGraded
+                            ? "bg-emerald-50 border-emerald-200"
+                            : "bg-slate-50 border-slate-200"
+                        }`}
                       >
-                        <Download className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{sub.file_name}</span>
-                      </a>
-                      <span className="text-xs text-slate-400">
-                        {new Date(sub.submitted_at).toLocaleDateString("es-ES", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  ))}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-slate-500">
+                            {new Date(sub.submitted_at).toLocaleDateString("es-ES", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {sub.files && sub.files.length > 1 && (
+                              <span className="ml-2 text-slate-400">
+                                · {sub.files.length} archivos
+                              </span>
+                            )}
+                          </span>
+                          {!isGraded && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubmission(sub)}
+                              className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Eliminar entrega completa"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          {(sub.files || []).map((f) => (
+                            <a
+                              key={f.id}
+                              href={
+                                supabaseRef.current.storage
+                                  .from("edutask-submissions")
+                                  .getPublicUrl(f.file_path).data.publicUrl
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 truncate"
+                            >
+                              <Download className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{f.file_name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
 
                   {taskSubmissions.some((s) => s.score != null) && (() => {
                     const gradedSub = taskSubmissions.find((s) => s.score != null);
@@ -722,13 +797,16 @@ export default function TasksPage() {
                             {gradedSub.teacher_comment}
                           </p>
                         )}
+                        <p className="text-xs text-emerald-700 mt-2 italic">
+                          Entrega cerrada: el profesor ya calificó. No se puede editar.
+                        </p>
                       </div>
                     );
                   })()}
 
-                  {canSubmit && (
+                  {canSubmit && !isGraded && (
                     <p className="text-xs text-slate-400">
-                      Puedes volver a subir archivos para reemplazar tu entrega.
+                      Puedes agregar más archivos o eliminar los que aún no han sido calificados.
                     </p>
                   )}
                 </div>
@@ -738,7 +816,7 @@ export default function TasksPage() {
                 </p>
               )}
 
-              {canSubmit && (
+              {canSubmit && !isGraded && (
                 <div className="mt-4 space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -760,11 +838,10 @@ export default function TasksPage() {
                       multiple
                       accept={ACCEPTED_FILE_TYPES}
                       onChange={handleFileSelect}
-                      disabled={uploadFiles.length >= MAX_FILES}
                       className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 disabled:opacity-50"
                     />
                     <p className="text-xs text-slate-400 mt-1">
-                      PDF, Word, Excel, imágenes (max 10MB c/u, {MAX_FILES} archivos máximo)
+                      PDF, Word, Excel, PowerPoint, imágenes, zip. Máx {MAX_FILE_SIZE_LABEL} c/u, varios archivos permitidos
                     </p>
                   </div>
 
@@ -803,7 +880,7 @@ export default function TasksPage() {
                     className="w-full"
                   >
                     <Upload className="w-4 h-4" />
-                    {taskSubmissions.length > 0 ? "Reemplazar entrega" : "Entregar tarea"}
+                    {taskSubmissions.length > 0 ? "Agregar entrega" : "Entregar tarea"}
                   </Button>
                 </div>
               )}
